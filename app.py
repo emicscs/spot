@@ -58,6 +58,7 @@ def _nice_date(value):
 
 POSTS = {}
 SEEN = {}                    # (user, location) -> message count seen
+BASELINE = {}                # location -> message count right after reset (already "read")
 SPOT_VIEW = {}               # user -> {"propose_doc", "propose_summary", "history_doc"}
 
 
@@ -130,6 +131,7 @@ def _proposal_params(p):
 def reset_ui():
     POSTS.clear()
     SEEN.clear()
+    BASELINE.clear()
     SPOT_VIEW.clear()
     by_id = {}
     for m in sorted(workspace.MESSAGES, key=lambda m: m["timestamp"]):
@@ -142,6 +144,7 @@ def reset_ui():
         by_id[m["message_id"]] = _post(m["location"], m["author"], m["text"], kind=kind,
                                        params=params, parent=parent, ts=m["timestamp"],
                                        msg_id=m["message_id"])
+    BASELINE.update({loc: len(posts) for loc, posts in POSTS.items()})
 
 
 def _announce(p, skip_loc=None):
@@ -492,6 +495,10 @@ def _view(user, loc):
     return [dict(_render(p), replies=[_render(r) for r in p["replies"]]) for p in _posts(loc)]
 
 
+def _unread(user, loc):
+    return SEEN.get((user, loc), BASELINE.get(loc, 1)) < len(_posts(loc))
+
+
 def _activity(user):
     me = db.get_user(user)
     items = []
@@ -511,8 +518,7 @@ def _state(user):
     people = {u: _user(u) for u in workspace.ALL_USERS + ["spot"]}
     teams = [{"id": t["id"], "name": t["name"], "avatar_color": t["avatar_color"],
               "channels": [dict(c, location=f"channel:{c['id']}",
-                                unread=bool(SEEN.get((user, f"channel:{c['id']}"), 0)
-                                            < len(_posts(f"channel:{c['id']}"))))
+                                unread=_unread(user, f"channel:{c['id']}"))
                            for c in t["channels"]]}
              for t in _channels_for(user)]
     chats = [{"location": f"spot:{user}", "name": "Spot", "kind": "bot", "members": ["spot"]}]
@@ -525,7 +531,7 @@ def _state(user):
         last = posts[-1] if posts else None
         if last and last["replies"]:
             last = last["replies"][-1]
-        c["unread"] = SEEN.get((user, c["location"]), 0) < len(posts)
+        c["unread"] = _unread(user, c["location"])
         c["preview"] = last and {"author": last["author"], "ts": last["ts"],
                                  "text": last["text"] or "Sent a card"}
     return {"me": _user(user), "org": workspace.ORG_NAME, "people": people,
