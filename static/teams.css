@@ -346,6 +346,24 @@ img {
   gap: 5px;
   font-size: 11px;
   color: var(--subtle);
+  flex: none;
+}
+
+.rail-apps {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.rail-apps .rail-item.on:before {
+  left: 0;
 }
 
 .rail-item>.ic {
@@ -409,7 +427,7 @@ img {
 }
 
 .rail-bottom {
-  margin-top: auto;
+  flex: none;
 }
 
 .mastercard-mark {
@@ -2020,6 +2038,107 @@ img {
 .files-view {
   max-width: 900px;
   padding: 12px 0;
+}
+
+.native-view {
+  max-width: 960px;
+  padding: 24px 0;
+}
+
+.native-sidebar {
+  padding: 24px 22px;
+}
+
+.native-sidebar h2 {
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+  margin: 18px 0 8px;
+}
+
+.native-sidebar p {
+  font-size: 13px;
+  color: var(--subtle);
+  line-height: 1.6;
+}
+
+.native-app-icon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.native-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.agenda-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.agenda-event {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px;
+  text-align: left;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.agenda-event:hover {
+  border-color: var(--brand);
+  background: var(--hover);
+}
+
+.agenda-date {
+  flex: none;
+  width: 52px;
+  padding-right: 16px;
+  border-right: 3px solid var(--brand);
+  color: var(--brand);
+}
+
+.agenda-date small,.agenda-date strong,.agenda-copy>* {
+  display: block;
+}
+
+.agenda-date strong {
+  font-size: 24px;
+}
+
+.agenda-copy {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.agenda-copy strong {
+  font-size: 15px;
+}
+
+.agenda-copy span,.agenda-copy small {
+  color: var(--subtle);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .native-view { padding: 8px 0; }
+  .agenda-event { padding: 14px 12px; gap: 12px; }
+  .agenda-date { width: 42px; padding-right: 10px; }
 }
 
 .files-intro {

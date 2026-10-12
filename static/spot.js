@@ -33,12 +33,15 @@ const COMMANDS = [
   ["help", "See what Spot can do"],
 ];
 const savedLoc = store("spot.loc") || "chat:cutover-sync";
+const NATIVE_APPS = {
+  calendar: { title: "Calendar", glyph: "calendar_ltr_24_regular", description: "Your program, one meeting at a time.", note: "Sample agenda · October 12–16, 2026" },
+};
 const S = {
   user: store("spot.user2") || window.DEMO_DEFAULT_USER || "marcus.chen", view: savedLoc.startsWith("channel:") ? "teams" : "chat",
   loc: savedLoc, spotTab: "pending", contentTab: "conversation", state: null,
   posts: [], items: [], documents: [], errors: {}, replyTo: null, pending: null,
   collapsed: new Set(["ops", "pay"]), filter: "all", busy: false, loading: false,
-  requestId: 0, drawerReturn: null,
+  requestId: 0, drawerReturn: null, agendaDay: "all",
 };
 function md(text) {
   return esc(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
@@ -198,7 +201,7 @@ async function loadMain(scroll = "bottom") {
       const { items } = await api(`/api/spot/${S.spotTab}?${q({ user })}`);
       if (requestId !== S.requestId) return;
       S.items = items;
-    } else if (S.view !== "activity") {
+    } else if (S.view !== "activity" && !NATIVE_APPS[S.view]) {
       const { posts, error } = await api(`/api/location?${q({ user, loc })}`);
       if (requestId !== S.requestId) return;
       S.posts = posts;
@@ -256,6 +259,7 @@ async function runAction(messageId, data, loc) {
 }
 function renderChrome() {
   const { me, org, switcher, activity } = S.state;
+  $("#sidebar").setAttribute("aria-label", NATIVE_APPS[S.view]?.title || "Conversations");
   $("#org").innerHTML = `<span class="org-logo"><span class="mastercard-mark" aria-hidden="true"></span></span><div><strong>${esc(org)}</strong><small>Autonomous Region Program</small></div>`;
   $("#user-name").textContent = me.display_name;
   $("#user-button").title = `${me.display_name} · ${me.team} · ${me.role}. Switch demo user.`;
@@ -279,6 +283,11 @@ function chatRow(c) {
 function renderList() {
   const { teams, chats, activity } = S.state;
   const dismiss = `<button class="icon-button sidebar-close" id="close-sidebar" aria-label="Close conversations">${icon("dismiss_20_regular")}</button>`;
+  if (NATIVE_APPS[S.view]) {
+    const app = NATIVE_APPS[S.view];
+    $("#list").innerHTML = `<div class="list-head"><h1>${esc(app.title)}</h1>${dismiss}</div><div class="native-sidebar"><span class="native-app-icon">${icon(app.glyph)}</span><h2>${esc(app.description)}</h2><p>${esc(app.note)}</p></div><div class="section">Your workspace</div><div class="spot-links"><button class="spot-link" data-view="chat">${icon("chat_24_regular", "sm")}Conversations</button><button class="spot-link" data-view="teams">${icon("people_team_24_regular", "sm")}Teams & channels</button><button class="spot-link" data-spot-tab="pending">${avatar("spot", "sm")}Open Spot</button></div>`;
+    return;
+  }
   if (S.view === "activity") {
     $("#list").innerHTML = `<div class="list-head"><h1>Activity</h1>${dismiss}</div><div class="section">Awaiting your team <span>${activity.length}</span></div>` + (activity.length ? activity.map((a) => `<button class="act" data-review="${esc(a.proposal_id)}">${avatar("spot", "sm")}<div><strong>Approval requested</strong><small>${esc(a.summary)}</small><small>${esc(a.proposed_by)} · ${shortDate(a.ts)}</small></div></button>`).join("") : empty("All caught up", "Your team has no pending requests."));
     return;
@@ -306,7 +315,10 @@ function renderList() {
 function renderHead() {
   const mobile = `<button class="icon-button sidebar-toggle" id="toggle-sidebar" aria-label="Toggle conversations" aria-expanded="${$("#sidebar").classList.contains("mobile-open")}">${icon("panel_left_20_regular")}</button>`;
   let content = "";
-  if (S.view === "spot") {
+  if (NATIVE_APPS[S.view]) {
+    const app = NATIVE_APPS[S.view];
+    content = `${icon(app.glyph)}<div class="head-copy"><div class="head-title">${esc(app.title)}</div><div class="head-sub">${esc(app.note)}</div></div>`;
+  } else if (S.view === "spot") {
     content = `${avatar("spot", "lg")}<div class="head-copy"><div class="head-title">Spot <span class="role-pill">App</span></div><div class="head-sub">Keep every team on the same page</div></div><nav class="tabs" aria-label="Spot views">${[["pending", "Pending"], ["history", "History"], ["chat", "Chat"]].map(([id, label]) => `<button class="tab ${S.spotTab === id ? "on" : ""}" data-spot-tab="${id}" ${S.spotTab === id ? 'aria-current="page"' : ""}>${label}</button>`).join("")}</nav><div class="head-actions"><button class="icon-button" id="spot-info" aria-label="About Spot">${icon("info_16_regular")}</button></div>`;
   } else if (S.view === "activity") {
     content = `${icon("alert_24_regular")}<div class="head-copy"><div class="head-title">Your activity</div><div class="head-sub">The decisions that need your team's attention</div></div>`;
@@ -411,6 +423,32 @@ function renderSpotItems(scroll) {
   if (!pending && !S.items.length) inner.insertAdjacentHTML("beforeend", empty("No document history yet", "Your team has no approved requirements to display."));
   feed.replaceChildren(inner); feed.scrollTop = scroll === "keep" ? keep : 0;
 }
+const SAMPLE_AGENDA = [
+  { id: "gateway", date: "2026-10-14", start: "10:00", end: "10:30", title: "Gateway readiness check-in", organizer: "daniel.okafor", loc: "chat:gateway-readiness", summary: "Compare the gateway checklist with approved requirements and capture open questions before the next review." },
+  { id: "runbook", date: "2026-10-15", start: "14:00", end: "14:45", title: "Cutover runbook walkthrough", organizer: "priya.raman", loc: "channel:arp-cutover", summary: "Walk through owners, dependencies, and rollback steps. Bring any requirement changes to Spot for review." },
+  { id: "program", date: "2026-10-16", start: "11:00", end: "11:30", title: "Program weekly sync", organizer: "sofia.alvarez", loc: "channel:arp-general", summary: "Share this week’s decisions and align on the next steps across the Autonomous Region Program." },
+];
+function visibleAgenda() {
+  const locations = new Set([...S.state.chats.map((c) => c.location), ...S.state.teams.flatMap((t) => t.channels.map((c) => c.location))]);
+  return SAMPLE_AGENDA.filter((event) => locations.has(event.loc));
+}
+function meetingTime(event) { return `${time(`${event.date}T${event.start}`)} – ${time(`${event.date}T${event.end}`)}`; }
+function nativeIntro(eyebrow, title, description) {
+  return `<div class="files-intro"><div class="eyebrow">${esc(eyebrow)}</div><h1>${esc(title)}</h1><p>${esc(description)}</p></div>`;
+}
+function renderNativeApp() {
+  const inner = document.createElement("div"); inner.className = "feed-inner native-view";
+  const events = visibleAgenda();
+  const days = [...new Set(events.map((event) => event.date))];
+  if (!days.includes(S.agendaDay)) S.agendaDay = "all";
+  inner.innerHTML = nativeIntro("October 12–16, 2026", "Your week at a glance", "A sample agenda for the demo, linked to your visible conversations.") + `<div class="native-filters" aria-label="Filter agenda by day">${[["all", "This week"], ...days.map((date) => [date, new Date(`${date}T12:00`).toLocaleDateString([], { weekday: "short", day: "numeric" })])].map(([date, label]) => `<button class="filter-chip ${S.agendaDay === date ? "on" : ""}" data-agenda-day="${date}" aria-pressed="${S.agendaDay === date}">${esc(label)}</button>`).join("")}</div><div class="agenda-list">${events.filter((event) => S.agendaDay === "all" || event.date === S.agendaDay).map((event) => `<button class="agenda-event" data-meeting="${event.id}"><span class="agenda-date"><small>${new Date(`${event.date}T12:00`).toLocaleDateString([], { weekday: "short" })}</small><strong>${event.date.slice(-2)}</strong></span><span class="agenda-copy"><strong>${esc(event.title)}</strong><span>${esc(meetingTime(event))}</span><small>Organized by ${esc(person(event.organizer).display_name)}</small></span>${icon("chevron_right_12_regular", "sm")}</button>`).join("")}</div>`;
+  if (!events.length) inner.insertAdjacentHTML("beforeend", empty("No sample meetings", "Your visible conversations have no meetings in this demo agenda.", "calendar_ltr_24_regular"));
+  $("#feed").replaceChildren(inner); $("#feed").scrollTop = 0;
+}
+function showMeeting(id) {
+  const event = visibleAgenda().find((event) => event.id === id); if (!event) return;
+  showDrawer("Meeting details", `<h2 class="document-title">${esc(event.title)}</h2><p class="drawer-description">${esc(event.summary)}</p><div class="profile-facts"><div><small>When</small><strong>${esc(fullDate(`${event.date}T12:00`))}</strong><small>${esc(meetingTime(event))} · local time</small></div><div><small>Organizer</small><strong>${esc(person(event.organizer).display_name)}</strong></div></div><p class="drawer-description">Sample meeting for the demo.</p><button class="btn primary" data-loc="${event.loc}">Open conversation ${icon("arrow_right_20_regular", "sm")}</button>`);
+}
 function renderFiles() {
   const inner = document.createElement("div"); inner.className = "feed-inner files-view";
   inner.innerHTML = `<div class="files-intro"><div class="eyebrow">Your team’s source of truth</div><h1>Approved requirements</h1><p>Current documents available to ${esc(S.state.me.team)}. Every version has a named approver.</p></div><div class="file-list"><div class="file-table-head"><span>Document</span><span>Owner</span><span>Status</span></div>${S.documents.map((d) => `<button class="file-row" data-doc="${esc(d.doc_id)}"><span class="file-name">${icon("contact_card_24_regular")}<span><strong>${esc(d.title)}</strong><small>Version ${d.version} · Updated ${shortDate(d.updated_at)}</small></span></span><span>${esc(d.team)}</span><span class="approved-pill">✓ Approved</span></button>`).join("")}</div>`;
@@ -427,9 +465,13 @@ function renderMain(scroll = "bottom") {
   if (!S.state) return;
   renderHead();
   const spotCards = S.view === "spot" && S.spotTab !== "chat";
-  const files = S.view !== "spot" && S.view !== "activity" && S.contentTab === "files";
-  $("#composer").classList.toggle("hidden", spotCards || files || S.view === "activity");
-  $("#feed").classList.toggle("chat-feed", !spotCards && !files && S.view !== "activity" && !currentLoc().startsWith("channel:"));
+  const nativeApp = !!NATIVE_APPS[S.view];
+  const files = !nativeApp && S.view !== "spot" && S.view !== "activity" && S.contentTab === "files";
+  $("#composer").classList.toggle("hidden", nativeApp || spotCards || files || S.view === "activity");
+  $("#feed").setAttribute("aria-label", nativeApp ? NATIVE_APPS[S.view].title : files ? "Approved files" : "Messages");
+  $(".panel").setAttribute("aria-label", nativeApp ? NATIVE_APPS[S.view].title : "Conversation");
+  $("#feed").classList.toggle("chat-feed", !nativeApp && !spotCards && !files && S.view !== "activity" && !currentLoc().startsWith("channel:"));
+  if (nativeApp) { renderNativeApp(); return; }
   if (spotCards) { renderSpotItems(scroll); return; }
   if (files) { renderFiles(); return; }
   if (S.view === "activity") { renderActivityMain(); return; }
@@ -491,7 +533,7 @@ function renderSearch() {
   const channels = S.state.teams.flatMap((t) => t.channels.map((c) => ({ ...c, team: t.name }))).filter((c) => matching(c.name) || matching(c.team));
   const people = Object.values(S.state.people).filter((p) => matching(p.display_name) || matching(p.team));
   const docs = S.documents.filter((d) => matching(d.title) || matching(d.content));
-  const inConversation = S.view !== "activity" && (S.view !== "spot" || S.spotTab === "chat") && (S.view === "spot" || S.contentTab === "conversation");
+  const inConversation = !NATIVE_APPS[S.view] && S.view !== "activity" && (S.view !== "spot" || S.spotTab === "chat") && (S.view === "spot" || S.contentTab === "conversation");
   const messages = (inConversation ? S.posts : []).flatMap((p) => [p, ...p.replies].map((m) => ({ ...m, parent: currentLoc().startsWith("channel:") ? p.id : m.id }))).filter((m) => matching(m.text));
   const group = (label, items) => items.length ? `<div class="section">${label}</div>${items.slice(0, 5).join("")}` : "";
   results.innerHTML = group("Conversations", chats.map((c) => `<button class="search-result" data-loc="${c.location}">${chatAvatar(c)}<div><strong>${esc(c.name)}</strong><small>${c.kind === "bot" ? "App" : `${c.members.length} members`}</small></div></button>`)) + group("Channels", channels.map((c) => `<button class="search-result" data-loc="${c.location}">${icon("people_team_24_regular")}<div><strong>${esc(c.name)}</strong><small>${esc(c.team)}</small></div></button>`)) + group("In this conversation", messages.map((m) => `<button class="search-result" data-jump="${esc(m.parent)}">${avatar(m.author, "sm")}<div><strong>${esc(person(m.author).display_name)}</strong><small>${esc(m.text.slice(0, 150))}</small></div></button>`)) + group("Approved files", docs.map((d) => `<button class="search-result" data-doc="${esc(d.doc_id)}">${icon("contact_card_24_regular")}<div><strong>${esc(d.title)}</strong><small>Version ${d.version} · ${esc(d.team)}</small></div></button>`)) + group("People", people.map((p) => `<button class="search-result" data-person="${esc(p.name)}">${avatar(p.name, "sm")}<div><strong>${esc(p.display_name)}</strong><small>${esc(p.title)}</small></div></button>`));
@@ -584,6 +626,8 @@ document.addEventListener("click", async (e) => {
   if (t.dataset.loc) { open(t.dataset.loc); return; }
   if (t.dataset.user) { switchUser(t.dataset.user); return; }
   if (t.dataset.person) { showPerson(t.dataset.person); return; }
+  if (t.dataset.agendaDay) { S.agendaDay = t.dataset.agendaDay; renderNativeApp(); return; }
+  if (t.dataset.meeting) { showMeeting(t.dataset.meeting); return; }
   if (t.dataset.doc) { showDocument(t.dataset.doc); return; }
   if (t.dataset.review) {
     if (!canNavigate()) return;
@@ -633,7 +677,7 @@ document.addEventListener("click", async (e) => {
     if (S.view === "chat" && !S.loc.startsWith("chat:")) S.loc = S.state.chats.find((c) => c.kind !== "bot")?.location || S.state.chats[0].location;
     if (S.view === "teams" && !S.loc.startsWith("channel:")) S.loc = S.state.teams[0]?.channels[0]?.location || S.loc;
     alignConversationNavigation();
-    store("spot.loc", S.loc); restoreDraft(); loadMain(S.view === "spot" ? "top" : "bottom"); return;
+    store("spot.loc", S.loc); restoreDraft(); loadMain(S.view === "spot" || NATIVE_APPS[S.view] ? "top" : "bottom"); return;
   }
   switch (t.id) {
     case "theme-toggle": applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark", true); break;
