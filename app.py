@@ -301,7 +301,31 @@ def render_propose_form(user):
 def render_history(user):
     """History tab: pick a doc, show approved versions, then pending/rejected
     proposals labeled "Not approved: not binding." Returns None."""
-    st.info("History: coming next")
+    docs = {d["doc_id"]: d for d in db.get_docs_for_user(user)}
+    if not docs:
+        st.caption("No documents visible to you.")
+        return
+    doc_id = st.selectbox("Document", list(docs), key="history_doc",
+                          format_func=lambda i: f"{docs[i]['title']} ({docs[i]['team']})")
+    doc = docs[doc_id]
+    st.markdown(f"**Current: v{doc['version']}**, approved by {doc['approver']}")
+
+    st.markdown("##### Approved versions")
+    st.dataframe(
+        [{"Version": h["version"], "Changed by": h["changed_by"],
+          "Approved by": h["approved_by"], "Summary": h["summary"],
+          "Deadline": h["deadline"] or "", "Date": (h["changed_at"] or "")[:10]}
+         for h in db.get_history(doc_id)],
+        hide_index=True, use_container_width=True)
+
+    open_or_rejected = [p for p in db.get_proposals(doc_id) if p["status"] != "approved"]
+    if open_or_rejected:
+        st.markdown("##### Not approved: not binding")
+        for p in open_or_rejected:
+            with st.container(border=True):
+                st.markdown(f"**{p['status'].capitalize()}** · Not approved: not binding.")
+                st.caption(f"{p['summary']} · proposed by {p['proposed_by']} · "
+                           f"needs {p['required_team']} · deadline {p['deadline']}")
 
 
 def render_chat(user):
