@@ -31,7 +31,7 @@ function person(name) {
 }
 function initials(name) { return person(name).display_name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase(); }
 function avatar(name, size = "", presence = false) {
-  if (name === "spot") return `<span class="av bot ${size}" title="Spot"><img src="/static/spot-avatar.svg" alt=""></span>`;
+  if (name === "spot") return `<span class="av bot ${size}" title="Spot"><img src="/static/spot-avatar.png" alt=""></span>`;
   const p = person(name);
   return `<span class="av ${size}" style="background:${esc(p.avatar_color)}" title="${esc(p.display_name)}"><span>${esc(initials(name))}</span>${S.state?.people[name] ? `<img src="/static/avatars/${encodeURIComponent(name)}.jpg" alt="" decoding="async">` : ""}${presence ? '<i class="presence" aria-hidden="true"></i>' : ""}</span>`;
 }

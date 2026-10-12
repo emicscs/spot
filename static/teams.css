@@ -819,7 +819,7 @@ img {
 
 .av.bot {
   border-radius: 10px;
-  background: var(--brand);
+  background: #1c1c21;
 }
 
 .av.tile {
