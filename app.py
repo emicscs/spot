@@ -203,12 +203,24 @@ USERS = ["alice", "bob", "carol", "dave"]
 # ---------------------------------------------------------------------------
 
 CHANNELS = [
-    {"id": "ops", "team": "Ops Automation", "name": "General"},
-    {"id": "pay", "team": "Payments", "name": "General"},
+    {"id": "dm", "team": None, "name": "Spot"},  # 1:1 chat with the bot, one per user
+    {"id": "ops", "team": "Ops Automation", "name": "Ops Automation"},
+    {"id": "pay", "team": "Payments", "name": "Payments"},
 ]
-TEAM_CHANNEL = {c["team"]: c["id"] for c in CHANNELS}
+TEAM_CHANNEL = {c["team"]: c["id"] for c in CHANNELS if c["team"]}
 POSTS = {}
 SEEN = {}  # (user, channel) -> number of posts seen
+
+
+def _key(user, channel):
+    """Storage key for a chat: group chats are shared, the Spot chat is per user."""
+    key = f"dm-{user}" if channel == "dm" else channel
+    if key not in POSTS:
+        POSTS[key] = []
+        if channel == "dm":
+            _post(key, "Spot", f"Hi {user}! I'm **Spot**. Here you can talk to me without "
+                               "@mentioning me. Try **help**.")
+    return key
 
 
 def _post(channel, author, text="", kind=None, params=None, parent=None):
@@ -238,7 +250,7 @@ def _announce(p, old_content, skip_channel=None):
 def reset_ui():
     POSTS.clear()
     SEEN.clear()
-    for c in CHANNELS:
+    for c in CHANNELS[1:]:
         POSTS[c["id"]] = []
         _post(c["id"], "Spot", "Hi, I'm **Spot**. I keep this team's requirements under "
                                "version control. Mention me with **@Spot help** to get started.")
@@ -524,7 +536,7 @@ def handle_action(user, channel, message_id, data):
         msg.update(kind="proposal", params={"proposal_id": pid, "doc_id": doc["doc_id"],
                                             "old_content": doc["content"]})
         target = TEAM_CHANNEL.get(p["required_team"])
-        where = (f" I've asked them in **{p['required_team']} › General**."
+        where = (f" I've asked them in the **{p['required_team']}** chat."
                  if target and target != channel else "")
         _post(channel, "Spot", f"Routed to **{_routing(p, doc)}**.{where}", parent=post)
         _announce(p, doc["content"], skip_channel=channel)
@@ -554,9 +566,10 @@ def _render(msg):
 
 
 def _channel_view(user, channel):
-    SEEN[(user, channel)] = len(POSTS[channel])
+    key = _key(user, channel)
+    SEEN[(user, key)] = len(POSTS[key])
     return [dict(_render(p), replies=[_render(r) for r in p["replies"]])
-            for p in POSTS[channel]]
+            for p in POSTS[key]]
 
 
 def _state(user):
@@ -568,8 +581,15 @@ def _state(user):
         activity.append({"channel": TEAM_CHANNEL.get(me["team"]), "summary": p["summary"],
                          "doc": doc["title"], "proposed_by": p["proposed_by"],
                          "ts": p["created_at"]})
-    channels = [dict(c, unread=max(0, len(POSTS[c["id"]]) - SEEN.get((user, c["id"]), 0)))
-                for c in CHANNELS]
+    channels = []
+    for c in CHANNELS:
+        key = _key(user, c["id"])
+        last = POSTS[key][-1] if POSTS[key] else None
+        if last and last["replies"]:
+            last = last["replies"][-1]
+        channels.append(dict(c, unread=max(0, len(POSTS[key]) - SEEN.get((user, key), 0)),
+                             preview=last and {"author": last["author"], "ts": last["ts"],
+                                               "text": last["text"] or "Sent a card"}))
     return {"me": me, "users": [db.get_user(u) for u in USERS],
             "channels": channels, "activity": activity}
 
@@ -593,9 +613,10 @@ def api_channel(channel):
 def api_post():
     body = request.get_json()
     user, channel, text = body["user"], body["channel"], body["text"].strip()
-    post = _post(channel, user, text)
-    if re.search(r"@spot\b", text, flags=re.I):
-        handle_command(user, channel, text, post)
+    key = _key(user, channel)
+    post = _post(key, user, text)
+    if channel == "dm" or re.search(r"@spot\b", text, flags=re.I):
+        handle_command(user, key, text, post)
     return jsonify({"posts": _channel_view(user, channel)})
 
 
@@ -604,7 +625,7 @@ def api_action():
     body = request.get_json()
     user, channel = body["user"], body["channel"]
     try:
-        error = handle_action(user, channel, body["message_id"], body["data"])
+        error = handle_action(user, _key(user, channel), body["message_id"], body["data"])
     except PermissionError as e:
         error = str(e)
     return jsonify({"posts": _channel_view(user, channel), "error": error})
