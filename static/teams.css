@@ -1017,7 +1017,11 @@ img {
   margin: 0 4px;
 }
 
-.sidebar-toggle {
+.sidebar-toggle,.sidebar-close {
+  display: none;
+}
+
+.sidebar-backdrop {
   display: none;
 }
 
@@ -2565,7 +2569,19 @@ img {
   .list.mobile-open {
     display: flex;
   }
+  .sidebar-backdrop:not(.hidden) {
+    display: block;
+    position: fixed;
+    inset: 56px 0 0 56px;
+    z-index: 24;
+    background: #0006;
+    cursor: default;
+  }
   .sidebar-toggle {
+    display: grid;
+    flex: none;
+  }
+  .list-head .sidebar-close {
     display: grid;
     flex: none;
   }

@@ -270,12 +270,13 @@ function chatRow(c) {
 }
 function renderList() {
   const { teams, chats, activity } = S.state;
+  const dismiss = `<button class="icon-button sidebar-close" id="close-sidebar" aria-label="Close conversations">${icon("dismiss_20_regular")}</button>`;
   if (S.view === "activity") {
-    $("#list").innerHTML = `<div class="list-head"><h1>Activity</h1></div><div class="section">Awaiting your team <span>${activity.length}</span></div>` + (activity.length ? activity.map((a) => `<button class="act" data-loc="${a.location}">${avatar("spot", "sm")}<div><strong>Approval requested</strong><small>${esc(a.summary)}</small><small>${esc(a.proposed_by)} · ${shortDate(a.ts)}</small></div></button>`).join("") : empty("All caught up", "Your team has no pending requests."));
+    $("#list").innerHTML = `<div class="list-head"><h1>Activity</h1>${dismiss}</div><div class="section">Awaiting your team <span>${activity.length}</span></div>` + (activity.length ? activity.map((a) => `<button class="act" data-loc="${a.location}">${avatar("spot", "sm")}<div><strong>Approval requested</strong><small>${esc(a.summary)}</small><small>${esc(a.proposed_by)} · ${shortDate(a.ts)}</small></div></button>`).join("") : empty("All caught up", "Your team has no pending requests."));
     return;
   }
   if (S.view === "spot") {
-    $("#list").innerHTML = `<div class="list-head"><h1>Your decisions, aligned.</h1></div><div class="spot-nav"><div class="spot-nav-title">${avatar("spot", "sm")}Meet Spot</div><p>A shared source of truth for the requirements your teams depend on.</p><button class="btn" data-spot-tab="chat">Ask Spot a question ${icon("arrow_right_20_regular", "sm")}</button></div><div class="section">Workspace</div><div class="spot-links">${[["pending", "Pending approvals", "checkmark_circle_16_filled"], ["history", "Version history", "calendar_ltr_24_regular"], ["chat", "Chat with Spot", "chat_24_regular"]].map(([id, label, glyph]) => `<button class="spot-link ${S.spotTab === id ? "on" : ""}" data-spot-tab="${id}">${icon(glyph, "sm")}${label}</button>`).join("")}</div><div class="section">Back to the conversation</div>${chats.filter((c) => c.kind !== "bot").slice(0, 2).map(chatRow).join("")}`;
+    $("#list").innerHTML = `<div class="list-head"><h1>Your decisions, aligned.</h1>${dismiss}</div><div class="spot-nav"><div class="spot-nav-title">${avatar("spot", "sm")}Meet Spot</div><p>A shared source of truth for the requirements your teams depend on.</p><button class="btn" data-spot-tab="chat">Ask Spot a question ${icon("arrow_right_20_regular", "sm")}</button></div><div class="section">Workspace</div><div class="spot-links">${[["pending", "Pending approvals", "checkmark_circle_16_filled"], ["history", "Version history", "calendar_ltr_24_regular"], ["chat", "Chat with Spot", "chat_24_regular"]].map(([id, label, glyph]) => `<button class="spot-link ${S.spotTab === id ? "on" : ""}" data-spot-tab="${id}">${icon(glyph, "sm")}${label}</button>`).join("")}</div><div class="section">Back to the conversation</div>${chats.filter((c) => c.kind !== "bot").slice(0, 2).map(chatRow).join("")}`;
     return;
   }
   const unreadOnly = S.filter === "unread";
@@ -292,7 +293,7 @@ function renderList() {
   const conversations = visibleChats.filter((c) => c.kind !== "bot").map(chatRow).join("");
   const chatsBlock = `${favorites ? `<div class="section">Favorites</div>${favorites}` : ""}${conversations ? `<div class="section">Chats</div>${conversations}` : ""}`;
   const content = S.view === "chat" ? chatsBlock : teamsBlock;
-  $("#list").innerHTML = `<div class="list-head"><h1>${S.view === "chat" ? "Chat" : "Teams"}</h1><button class="icon-button" id="find-conversation" title="Find a conversation" aria-label="Find a conversation">${icon("search_20_regular")}</button></div><div class="list-filters"><button class="filter-chip ${!unreadOnly ? "on" : ""}" data-filter="all" aria-pressed="${!unreadOnly}">${S.view === "chat" ? "Chats" : "All"}</button><button class="filter-chip ${unreadOnly ? "on" : ""}" data-filter="unread" aria-pressed="${unreadOnly}">Unread</button></div>` + (content || empty("You're all caught up", "No unread conversations."));
+  $("#list").innerHTML = `<div class="list-head"><h1>${S.view === "chat" ? "Chat" : "Teams"}</h1><button class="icon-button" id="find-conversation" title="Find a conversation" aria-label="Find a conversation">${icon("search_20_regular")}</button>${dismiss}</div><div class="list-filters"><button class="filter-chip ${!unreadOnly ? "on" : ""}" data-filter="all" aria-pressed="${!unreadOnly}">${S.view === "chat" ? "Chats" : "All"}</button><button class="filter-chip ${unreadOnly ? "on" : ""}" data-filter="unread" aria-pressed="${unreadOnly}">Unread</button></div>` + (content || empty("You're all caught up", "No unread conversations."));
 }
 function renderHead() {
   const mobile = `<button class="icon-button sidebar-toggle" id="toggle-sidebar" aria-label="Toggle conversations" aria-expanded="${$("#sidebar").classList.contains("mobile-open")}">${icon("panel_left_20_regular")}</button>`;
@@ -468,7 +469,10 @@ function setUserMenu(open) {
   $("#user-menu").classList.toggle("hidden", !open); $("#user-button").setAttribute("aria-expanded", String(open));
   if (open) $("#user-menu .user-option.on")?.focus();
 }
-function closeSearch() { $("#search-results").classList.add("hidden"); $("#search").setAttribute("aria-expanded", "false"); }
+function closeSearch(restoreFocus = false) {
+  if (restoreFocus && $("#search-results").contains(document.activeElement)) $("#search").focus();
+  $("#search-results").classList.add("hidden"); $("#search").setAttribute("aria-expanded", "false");
+}
 function focusSearch() { $("#search").focus(); $("#search").select(); renderSearch(); }
 function renderSearch() {
   if (!S.state) return;
@@ -521,9 +525,24 @@ function showDocument(id) {
   showDrawer("Approved requirement", `<h2 class="document-title">${esc(d.title)}</h2><div class="document-meta"><span class="approved-pill">✓ Approved</span>Version ${d.version} · ${esc(d.team)}</div><div class="document-content">${esc(d.content)}</div><div class="profile-facts"><div><small>Author</small><strong>${esc(person(d.author).display_name)}</strong></div><div><small>Approved by</small><strong>${esc(person(d.approver).display_name)}</strong></div><div><small>Updated</small><strong>${esc(fullDate(d.updated_at))}</strong></div></div><button class="btn primary" data-doc-history="${esc(id)}">View version history ${icon("arrow_right_20_regular", "sm")}</button>`);
 }
 function canNavigate() { if (S.busy || S.loading) { toast("Finishing your request…"); return false; } return true; }
+function setSidebarOpen(open, restoreFocus = false) {
+  const visible = open && window.matchMedia("(max-width: 760px)").matches;
+  $("#sidebar").classList.toggle("mobile-open", visible);
+  $("#sidebar-backdrop").classList.toggle("hidden", !visible);
+  $("#toggle-sidebar")?.setAttribute("aria-expanded", String(visible));
+  if (visible) $("#list").querySelector('[aria-current="page"], button')?.focus();
+  else if (restoreFocus) $("#toggle-sidebar")?.focus();
+}
+window.matchMedia("(max-width: 760px)").addEventListener("change", () => setSidebarOpen(false));
+function alignConversationNavigation() {
+  if (!["chat", "teams"].includes(S.view)) return;
+  S.view = S.loc.startsWith("channel:") ? "teams" : "chat";
+  const team = S.state.teams.find((t) => t.channels.some((c) => c.location === S.loc));
+  if (team) S.collapsed.delete(team.id);
+}
 function prepareNavigation() {
   saveDraft(); hidePopup(); closeSearch(); setUserMenu(false); closeDrawer();
-  $("#sidebar").classList.remove("mobile-open");
+  setSidebarOpen(false);
   S.errors = {}; S.replyTo = null;
 }
 async function open(loc) {
@@ -531,6 +550,7 @@ async function open(loc) {
   prepareNavigation();
   if (loc.startsWith("spot:")) { S.view = "spot"; S.spotTab = "chat"; }
   else { S.loc = loc; S.view = loc.startsWith("chat:") ? "chat" : "teams"; }
+  alignConversationNavigation();
   S.contentTab = "conversation"; store("spot.loc", S.loc); restoreDraft();
   await loadMain();
 }
@@ -543,6 +563,7 @@ async function switchUser(user) {
     await loadState();
     const visible = [...S.state.chats.map((c) => c.location), ...S.state.teams.flatMap((t) => t.channels.map((c) => c.location))];
     if (!visible.includes(S.loc)) S.loc = visible.find((loc) => !loc.startsWith("spot:")) || visible[0];
+    alignConversationNavigation();
     store("spot.loc", S.loc); restoreDraft(); await loadMain();
     toast(`${S.state.me.display_name} · ${S.state.me.team} · ${S.state.me.role}`);
   } catch (error) { toast(error.message); S.loading = false; autosize(); }
@@ -591,6 +612,7 @@ document.addEventListener("click", async (e) => {
     prepareNavigation(); S.view = t.dataset.view; S.contentTab = "conversation";
     if (S.view === "chat" && !S.loc.startsWith("chat:")) S.loc = S.state.chats.find((c) => c.kind !== "bot")?.location || S.state.chats[0].location;
     if (S.view === "teams" && !S.loc.startsWith("channel:")) S.loc = S.state.teams[0]?.channels[0]?.location || S.loc;
+    alignConversationNavigation();
     store("spot.loc", S.loc); restoreDraft(); loadMain(S.view === "spot" ? "top" : "bottom"); return;
   }
   switch (t.id) {
@@ -604,9 +626,8 @@ document.addEventListener("click", async (e) => {
     }
     case "retry": S.state ? loadMain() : init(); break;
     case "user-button": setUserMenu($("#user-menu").classList.contains("hidden")); break;
-    case "toggle-sidebar": {
-      const on = $("#sidebar").classList.toggle("mobile-open"); t.setAttribute("aria-expanded", String(on)); break;
-    }
+    case "toggle-sidebar": setSidebarOpen(!$("#sidebar").classList.contains("mobile-open")); break;
+    case "sidebar-backdrop": case "close-sidebar": setSidebarOpen(false, true); break;
     case "members": showMembers(); break;
     case "conversation-info": showConversationInfo(); break;
     case "spot-info": showSpotInfo(); break;
@@ -632,7 +653,21 @@ $("#user-select").addEventListener("change", (e) => switchUser(e.target.value));
 $("#search").addEventListener("input", renderSearch);
 $("#search").addEventListener("focus", renderSearch);
 $("#search").addEventListener("keydown", (e) => {
-  if (e.key === "ArrowDown" || e.key === "Enter") { const first = $("#search-results .search-result"); if (first) { e.preventDefault(); first.focus(); } }
+  if (!["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
+  const results = [...$("#search-results").querySelectorAll(".search-result")];
+  if (!results.length || $("#search-results").classList.contains("hidden")) return;
+  e.preventDefault();
+  if (e.key === "Enter") results[0].click();
+  else (e.key === "ArrowUp" ? results.at(-1) : results[0]).focus();
+});
+$("#search-results").addEventListener("keydown", (e) => {
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+  const results = [...$("#search-results").querySelectorAll(".search-result")];
+  if (!results.length) return;
+  const index = results.indexOf(document.activeElement);
+  const next = e.key === "Home" ? 0 : e.key === "End" ? results.length - 1
+    : (index + (e.key === "ArrowUp" ? -1 : 1) + results.length) % results.length;
+  e.preventDefault(); results[next].focus(); results[next].scrollIntoView({ block: "nearest" });
 });
 $("#compose").addEventListener("input", () => { autosize(); saveDraft(); updatePopup(); });
 $("#compose").addEventListener("keydown", (e) => {
@@ -648,8 +683,8 @@ $("#compose").addEventListener("keydown", (e) => {
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); focusSearch(); }
   if (e.key === "Escape") {
-    hidePopup(); closeSearch(); setUserMenu(false); closeDrawer(); $("#sidebar").classList.remove("mobile-open");
-    $("#toggle-sidebar")?.setAttribute("aria-expanded", "false");
+    hidePopup(); closeSearch(true); setUserMenu(false); closeDrawer();
+    if ($("#sidebar").classList.contains("mobile-open")) setSidebarOpen(false, true);
   }
   if (e.key === "Tab" && !$("#drawer").classList.contains("hidden")) {
     const elements = [...$("#drawer").querySelectorAll("button,a,input,select,textarea,[tabindex='0']")];
@@ -664,6 +699,7 @@ async function init() {
     await loadState();
     const visible = [...S.state.chats.map((c) => c.location), ...S.state.teams.flatMap((t) => t.channels.map((c) => c.location))];
     if (!visible.includes(S.loc)) S.loc = visible.find((loc) => !loc.startsWith("spot:")) || visible[0];
+    alignConversationNavigation();
     restoreDraft(); await loadMain();
   } catch (error) {
     $("#feed").setAttribute("aria-busy", "false");
