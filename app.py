@@ -591,6 +591,15 @@ def api_location():
     return jsonify({"posts": _view(user, loc)})
 
 
+@app.get("/api/documents")
+def api_documents():
+    """Approved files visible to the signed-in demo user, using contract permissions."""
+    user = request.args.get("user", "")
+    if not db.get_user(user):
+        return jsonify({"error": "Choose a demo user.", "documents": []}), 400
+    return jsonify({"documents": db.get_docs_for_user(user)})
+
+
 @app.get("/api/spot/<tab>")
 def api_spot(tab):
     return jsonify({"items": _spot_items(request.args["user"], tab)})
