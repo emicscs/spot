@@ -1,16 +1,17 @@
-"""Streamlit UI for Spot. Owner: Frankie. See CONTRACTS.md.
+"""Spot UI: a Microsoft Teams lookalike. Owner: Frankie. See CONTRACTS.md.
 
-Run: streamlit run app.py
-Tabs: Pending, History, Chat. Sidebar: user picker, team/role, Reset demo.
-Build against fake return values first; swap in real imports
-(db, governance, rag) at integration.
+Run: python app.py, then open http://localhost:8501
+The page in static/ emulates a Teams channel. You talk to Spot by typing
+"@Spot <command>"; Spot replies with Adaptive Cards built in this file.
+Build against fake return values first (USE_FAKES = True); swap in the real
+db, governance and rag at integration.
 """
+import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from html import escape
 from types import SimpleNamespace
 
-import streamlit as st
+from flask import Flask, jsonify, request, send_from_directory
 
 # Flip to False at integration (1:05) to use the real db, governance and rag.
 USE_FAKES = True
@@ -18,7 +19,7 @@ USE_FAKES = True
 
 # ---------------------------------------------------------------------------
 # Fake backend: same signatures and return shapes as CONTRACTS.md, kept in
-# st.session_state so propose/approve/reject actually change what you see.
+# memory so propose/approve/reject actually change what you see.
 # ---------------------------------------------------------------------------
 
 FAKE_USERS = {
@@ -66,10 +67,7 @@ def _fake_seed():
             "proposals": proposals, "deps": [("Payments", "Ops Automation")]}
 
 
-def _store():
-    if "fake" not in st.session_state:
-        st.session_state.fake = _fake_seed()
-    return st.session_state.fake
+_FAKE = _fake_seed()
 
 
 def _fake_get_user(name):
@@ -77,46 +75,47 @@ def _fake_get_user(name):
 
 
 def _fake_get_doc(doc_id):
-    d = _store()["docs"].get(doc_id)
+    d = _FAKE["docs"].get(doc_id)
     return dict(d) if d else None
 
 
 def _fake_get_docs_for_user(name):
     user = _fake_get_user(name)
-    teams = {user["team"]} | {dep for t, dep in _store()["deps"] if t == user["team"]}
-    return [dict(d) for d in _store()["docs"].values() if d["team"] in teams]
+    teams = {user["team"]} | {dep for t, dep in _FAKE["deps"] if t == user["team"]}
+    return [dict(d) for d in _FAKE["docs"].values() if d["team"] in teams]
 
 
 def _fake_get_history(doc_id):
-    rows = [dict(h) for h in _store()["history"] if h["doc_id"] == doc_id]
+    rows = [dict(h) for h in _FAKE["history"] if h["doc_id"] == doc_id]
     return sorted(rows, key=lambda h: h["version"], reverse=True)
 
 
 def _fake_get_proposals(doc_id):
-    return [dict(p) for p in _store()["proposals"] if p["doc_id"] == doc_id]
+    return [dict(p) for p in _FAKE["proposals"] if p["doc_id"] == doc_id]
 
 
 def _fake_get_pending():
-    return [dict(p) for p in _store()["proposals"] if p["status"] == "pending"]
+    return [dict(p) for p in _FAKE["proposals"] if p["status"] == "pending"]
 
 
 def _fake_get_dependent_teams(team):
-    return [t for t, dep in _store()["deps"] if dep == team]
+    return [t for t, dep in _FAKE["deps"] if dep == team]
 
 
 def _fake_reset():
-    st.session_state.pop("fake", None)
+    global _FAKE
+    _FAKE = _fake_seed()
 
 
 def _fake_propose(user, doc_id, new_content, summary, deadline):
-    u, doc = _fake_get_user(user), _store()["docs"][doc_id]
+    u, doc = _fake_get_user(user), _FAKE["docs"][doc_id]
     if u["role"] not in ("Contributor", "Approver"):
         raise PermissionError(f"{user} is a {u['role']}; only Contributors and Approvers can propose")
     if u["team"] != doc["team"]:
         raise PermissionError(f"Only {doc['team']} can propose changes to {doc['title']}")
     dependents = _fake_get_dependent_teams(doc["team"])
     proposal_id = str(uuid.uuid4())
-    _store()["proposals"].append({
+    _FAKE["proposals"].append({
         "proposal_id": proposal_id, "doc_id": doc_id, "new_content": new_content,
         "summary": summary, "deadline": deadline, "proposed_by": user,
         "required_team": dependents[0] if dependents else doc["team"],
@@ -126,7 +125,7 @@ def _fake_propose(user, doc_id, new_content, summary, deadline):
 
 
 def _fake_check_reviewer(user, p):
-    u, doc = _fake_get_user(user), _store()["docs"][p["doc_id"]]
+    u, doc = _fake_get_user(user), _FAKE["docs"][p["doc_id"]]
     if p["status"] != "pending":
         raise PermissionError(f"This proposal is already {p['status']}")
     if u["team"] != p["required_team"]:
@@ -138,16 +137,16 @@ def _fake_check_reviewer(user, p):
 
 
 def _fake_find(proposal_id):
-    return next(p for p in _store()["proposals"] if p["proposal_id"] == proposal_id)
+    return next(p for p in _FAKE["proposals"] if p["proposal_id"] == proposal_id)
 
 
 def _fake_approve(user, proposal_id):
     p = _fake_find(proposal_id)
     _fake_check_reviewer(user, p)
-    doc = _store()["docs"][p["doc_id"]]
+    doc = _FAKE["docs"][p["doc_id"]]
     doc.update(content=p["new_content"], version=doc["version"] + 1,
                approver=user, updated_at=_now())
-    _store()["history"].append({
+    _FAKE["history"].append({
         "doc_id": doc["doc_id"], "version": doc["version"], "content": p["new_content"],
         "changed_by": p["proposed_by"], "approved_by": user, "summary": p["summary"],
         "deadline": p["deadline"], "changed_at": doc["updated_at"],
@@ -162,18 +161,19 @@ def _fake_reject(user, proposal_id):
     p["status"] = "rejected"
 
 
-def _fake_ask(user, question):
-    def tokens(text):
-        return {w.strip("?.,:").lower() for w in text.split() if len(w) > 3}
+def _tokens(text):
+    return {w.strip("?.,:()").lower() for w in text.split() if len(w) > 3}
 
-    words = tokens(question)
-    scored = [(len(words & tokens(d["title"] + " " + line)), line, d)
+
+def _fake_ask(user, question):
+    words = _tokens(question)
+    scored = [(len(words & _tokens(d["title"] + " " + line)), line, d)
               for d in _fake_get_docs_for_user(user) for line in d["content"].splitlines()]
     score, line, d = max(scored, key=lambda s: s[0], default=(0, None, None))
     if score < 2:
         return {"answer": "That isn't in your documents.", "sources": []}
     source = {k: d[k] for k in ("doc_id", "title", "version", "author", "approver")}
-    return {"answer": f"{line} ({d['title']}, v{d['version']}, "
+    return {"answer": f"{line} (Source: {d['title']}, v{d['version']}, "
                       f"author {d['author']}, approved by {d['approver']})",
             "sources": [source]}
 
@@ -196,283 +196,434 @@ USERS = ["alice", "bob", "carol", "dave"]
 
 
 # ---------------------------------------------------------------------------
-# UI
+# Teams state: channels and posts. UI-only, never stored in the database.
+# A post is {"id", "author", "text", "ts", "kind", "params", "replies"}; cards
+# are rebuilt from the database on every read, so they refresh in place the
+# way Teams Universal Action cards do.
 # ---------------------------------------------------------------------------
 
-def render_sidebar():
-    """Sidebar: user picker (4 users), shows team and role, Reset demo button.
-    Returns the selected user name (str)."""
-    with st.sidebar:
-        st.caption("DEMO CONTROLS (not part of Teams)")
-        user = st.selectbox("Signed in as", USERS, key="user")
-        info = db.get_user(user)
-        st.markdown(f"**{info['team']}** · {info['role']}")
-        if st.button("Reset demo", width="stretch"):
-            db.reset()
-            for key in list(st.session_state):
-                if key.startswith("chat_"):
-                    del st.session_state[key]
-            st.toast("Demo data reset")
-    return user
+CHANNELS = [
+    {"id": "ops", "team": "Ops Automation", "name": "General"},
+    {"id": "pay", "team": "Payments", "name": "General"},
+]
+TEAM_CHANNEL = {c["team"]: c["id"] for c in CHANNELS}
+POSTS = {}
+SEEN = {}  # (user, channel) -> number of posts seen
 
 
-def render_pending(user):
-    """Pending tab: proposals with old vs new content, summary, deadline,
-    routing line, Approve/Reject buttons (show PermissionError reason),
-    and a Propose change form. Returns None."""
-    flash = st.session_state.pop("flash", None)
-    if flash:
-        st.success(flash)
-    render_propose_form(user)
-    pending = db.get_pending()
-    if not pending:
-        st.caption("No pending proposals.")
-    for p in pending:
-        render_proposal_card(user, p)
+def _post(channel, author, text="", kind=None, params=None, parent=None):
+    msg = {"id": uuid.uuid4().hex[:12], "author": author, "text": text, "ts": _now(),
+           "kind": kind, "params": params or {}, "replies": []}
+    (parent["replies"] if parent else POSTS[channel]).append(msg)
+    return msg
 
 
-def routing_line(p, doc):
-    """Human-readable reason a proposal went to its required_team."""
+def _find_post(channel, message_id):
+    for post in POSTS[channel]:
+        for msg in [post] + post["replies"]:
+            if msg["id"] == message_id:
+                return post, msg
+    raise KeyError(message_id)
+
+
+def _announce(p, old_content, skip_channel=None):
+    """Post the approval request in the reviewing team's channel."""
+    channel = TEAM_CHANNEL.get(p["required_team"])
+    if channel and channel != skip_channel:
+        _post(channel, "Spot", f"**@{p['required_team']}** approval requested",
+              kind="proposal", params={"proposal_id": p["proposal_id"],
+                                       "doc_id": p["doc_id"], "old_content": old_content})
+
+
+def reset_ui():
+    POSTS.clear()
+    SEEN.clear()
+    for c in CHANNELS:
+        POSTS[c["id"]] = []
+        _post(c["id"], "Spot", "Hi, I'm **Spot**. I keep this team's requirements under "
+                               "version control. Mention me with **@Spot help** to get started.")
+    for p in db.get_pending():
+        doc = db.get_doc(p["doc_id"])
+        _announce(p, doc["content"])
+        if TEAM_CHANNEL.get(doc["team"]) != TEAM_CHANNEL.get(p["required_team"]):
+            _post(TEAM_CHANNEL[doc["team"]], "Spot",
+                  f"**{p['proposed_by']}** proposed a change. Waiting on "
+                  f"**{p['required_team']}**.", kind="proposal",
+                  params={"proposal_id": p["proposal_id"], "doc_id": p["doc_id"],
+                          "old_content": doc["content"]})
+
+
+# ---------------------------------------------------------------------------
+# Adaptive Cards (schema 1.5). The same JSON would ship to real Teams.
+# ---------------------------------------------------------------------------
+
+def _card(body, actions=None):
+    card = {"type": "AdaptiveCard", "version": "1.5", "body": body}
+    if actions:
+        card["actions"] = actions
+    return card
+
+
+def _text(text, **kw):
+    return {"type": "TextBlock", "text": text, "wrap": True, **kw}
+
+
+def _eyebrow(label):
+    return _text(f"SPOT · {label}", size="Small", weight="Bolder", isSubtle=True,
+                 spacing="None")
+
+
+def _routing(p, doc):
     if p["required_team"] != doc["team"]:
-        return f"Routed to: {p['required_team']} (depends on {doc['team']})"
-    return f"Routed to: {p['required_team']} (no other team depends on it)"
+        return f"{p['required_team']} (depends on {doc['team']})"
+    return f"{p['required_team']} (no other team depends on it)"
 
 
-def render_proposal_card(user, p):
-    doc = db.get_doc(p["doc_id"])
-    with st.container(border=True, key=f"card_{p['proposal_id']}"):
-        facts = [("Document", doc["title"]), ("Proposed by", p["proposed_by"]),
-                 ("Deadline", p["deadline"] or "none"),
-                 ("Routed to", routing_line(p, doc).removeprefix("Routed to: "))]
-        st.markdown(
-            f'<div class="ac-head"><span>📍 Spot</span><span>{escape(p["created_at"][:10])}</span></div>'
-            f'<div class="ac-title">Approval requested from {escape(p["required_team"])}</div>'
-            f'<div class="ac-sub">{escape(p["summary"])}</div>'
-            '<table class="ac-facts">' + "".join(
-                f"<tr><td>{k}</td><td>{escape(str(v))}</td></tr>" for k, v in facts)
-            + "</table>",
-            unsafe_allow_html=True)
-        old_html, new_html = diff_html(doc["content"], p["new_content"])
-        old, new = st.columns(2)
-        old.markdown(f'<div class="ac-doc">Current (v{doc["version"]}, approved)</div>{old_html}',
-                     unsafe_allow_html=True)
-        new.markdown(f'<div class="ac-doc">Proposed</div>{new_html}', unsafe_allow_html=True)
-        approve_col, reject_col, _ = st.columns([1, 1, 8], gap="small")
-        action = None
-        if approve_col.button("Approve", key=f"approve_{p['proposal_id']}", type="primary"):
-            action = "approve"
-        if reject_col.button("Reject", key=f"reject_{p['proposal_id']}"):
-            action = "reject"
-        if action:
-            try:
-                if action == "approve":
-                    version = governance.approve(user, p["proposal_id"])
-                    st.session_state.flash = (f"Approved by {user}: {doc['title']} "
-                                              f"is now v{version}")
-                else:
-                    governance.reject(user, p["proposal_id"])
-                    st.session_state.flash = f"Rejected by {user}: {p['summary']}"
-            except PermissionError as e:
-                st.error(f"Blocked: {e}")
-            else:
-                st.rerun()
+def _content_column(label, content, other, color):
+    other_lines = set(other.splitlines())
+    lines = [_text(line, fontType="Monospace", size="Small", spacing="None",
+                   **({"color": color, "weight": "Bolder"} if line not in other_lines else {}))
+             for line in content.splitlines() if line.strip()]
+    return {"type": "Column", "width": "stretch", "items": [
+        _text(label, size="Small", weight="Bolder", isSubtle=True),
+        {"type": "Container", "style": "emphasis", "bleed": False, "items": lines},
+    ]}
 
 
-def render_propose_form(user):
+def proposal_card(params):
+    p = next((x for x in db.get_proposals(params["doc_id"])
+              if x["proposal_id"] == params["proposal_id"]), None)
+    doc = db.get_doc(params["doc_id"])
+    if not p or not doc:
+        return _card([_text("This proposal no longer exists.", isSubtle=True)])
+    old = params.get("old_content", doc["content"])
+    status = p["status"]
+    title = {"pending": f"Approval requested from {p['required_team']}",
+             "approved": f"Approved by {p['approved_by']}",
+             "rejected": "Rejected"}[status]
+    body = [
+        _eyebrow("CHANGE REQUEST"),
+        _text(title, size="Large", weight="Bolder", spacing="Small",
+              **({"color": "Good"} if status == "approved" else
+                 {"color": "Attention"} if status == "rejected" else {})),
+        _text(p["summary"], spacing="Small"),
+        {"type": "FactSet", "facts": [
+            {"title": "Document", "value": doc["title"]},
+            {"title": "Proposed by", "value": p["proposed_by"]},
+            {"title": "Deadline", "value": p["deadline"] or "none"},
+            {"title": "Routed to", "value": _routing(p, doc)},
+        ]},
+        {"type": "ColumnSet", "spacing": "Medium", "columns": [
+            _content_column("CURRENT · APPROVED" if status == "pending" else "BEFORE",
+                            old, p["new_content"], "Attention"),
+            _content_column("PROPOSED" if status == "pending" else "AFTER",
+                            p["new_content"], old, "Good"),
+        ]},
+    ]
+    if status == "approved":
+        body.append(_text(f"✅ Binding now. {doc['title']} is v{doc['version']}, "
+                          f"changed by {p['proposed_by']}, approved by {p['approved_by']}.",
+                          color="Good", size="Small", spacing="Medium"))
+        return _card(body)
+    if status == "rejected":
+        body.append(_text("Not approved: not binding.", color="Attention", size="Small",
+                          spacing="Medium"))
+        return _card(body)
+    data = {"proposal_id": p["proposal_id"], "doc_id": p["doc_id"]}
+    return _card(body, [
+        {"type": "Action.Submit", "title": "Approve", "style": "positive",
+         "data": {"action": "approve", **data}},
+        {"type": "Action.Submit", "title": "Reject", "style": "destructive",
+         "data": {"action": "reject", **data}},
+    ])
+
+
+def propose_form_card(params):
+    doc = db.get_doc(params["doc_id"])
+    dependents = db.get_dependent_teams(doc["team"])
+    route = (f"{dependents[0]}, because {dependents[0]} depends on {doc['team']}"
+             if dependents else f"{doc['team']}, because no other team depends on it")
+    return _card([
+        _eyebrow("PROPOSE A CHANGE"),
+        _text(doc["title"], size="Large", weight="Bolder", spacing="Small"),
+        _text(f"Current: v{doc['version']}, approved by {doc['approver']}",
+              isSubtle=True, size="Small", spacing="None"),
+        {"type": "Input.Text", "id": "new_content", "label": "New content",
+         "isMultiline": True, "value": doc["content"], "isRequired": True,
+         "errorMessage": "Enter the new content"},
+        {"type": "Input.Text", "id": "summary", "label": "What changed and why",
+         "placeholder": "e.g. Cutover moved two weeks per Infra meeting 10/9",
+         "isRequired": True, "errorMessage": "Add a short summary"},
+        {"type": "Input.Date", "id": "deadline", "label": "Approval needed by",
+         "value": (date.today() + timedelta(days=7)).isoformat(), "isRequired": True},
+        _text(f"Spot will route this to {route}.", isSubtle=True, size="Small"),
+    ], [{"type": "Action.Submit", "title": "Submit for approval", "style": "positive",
+         "data": {"action": "submit_proposal", "doc_id": doc["doc_id"]}}])
+
+
+def doc_picker_card(params):
+    return _card([
+        _eyebrow(params["label"].upper()),
+        _text(params["prompt"], weight="Bolder"),
+        {"type": "Input.ChoiceSet", "id": "doc_id", "style": "compact", "isRequired": True,
+         "value": params["docs"][0]["doc_id"],
+         "choices": [{"title": d["title"], "value": d["doc_id"]} for d in params["docs"]]},
+    ], [{"type": "Action.Submit", "title": "Continue",
+         "data": {"action": params["next"]}}])
+
+
+def history_card(params):
+    doc = db.get_doc(params["doc_id"])
+    body = [
+        _eyebrow("HISTORY"),
+        _text(doc["title"], size="Large", weight="Bolder", spacing="Small"),
+        _text(f"{doc['team']} · current v{doc['version']}, approved by {doc['approver']}",
+              isSubtle=True, size="Small", spacing="None"),
+    ]
+    for i, h in enumerate(db.get_history(doc["doc_id"])):
+        meta = (f"changed by {h['changed_by']} · approved by {h['approved_by']} · "
+                f"{(h['changed_at'] or '')[:10]}")
+        if h["deadline"]:
+            meta += f" · deadline {h['deadline']}"
+        body.append({"type": "ColumnSet", "separator": True, "spacing": "Medium", "columns": [
+            {"type": "Column", "width": "40px", "items": [
+                _text(f"v{h['version']}", weight="Bolder", size="Medium",
+                      **({"color": "Good"} if i == 0 else {}))]},
+            {"type": "Column", "width": "stretch", "items": [
+                _text(h["summary"] + ("  ·  **CURRENT**" if i == 0 else "")),
+                _text(meta, isSubtle=True, size="Small", spacing="None")]},
+        ]})
+    not_binding = [p for p in db.get_proposals(doc["doc_id"]) if p["status"] != "approved"]
+    if not_binding:
+        body.append(_text("NOT APPROVED: NOT BINDING", weight="Bolder", size="Small",
+                          color="Attention", separator=True, spacing="Large"))
+        for p in not_binding:
+            body.append(_text(f"**{p['status'].capitalize()}:** {p['summary']}", spacing="Small"))
+            body.append(_text(f"proposed by {p['proposed_by']} · needs {p['required_team']} · "
+                              f"deadline {p['deadline']} · Not approved: not binding.",
+                              isSubtle=True, size="Small", spacing="None"))
+    return _card(body)
+
+
+def answer_card(params):
+    body = [_eyebrow("ANSWER"), _text(params["answer"], spacing="Small")]
+    if params["sources"]:
+        body.append(_text("SOURCES", size="Small", weight="Bolder", isSubtle=True,
+                          separator=True, spacing="Medium"))
+        for s in params["sources"]:
+            body.append(_text(f"📄 **{s['title']}** · v{s['version']} · by {s['author']} · "
+                              f"approved by {s['approver']}", size="Small", spacing="Small"))
+    body.append(_text("Answered from approved documents only. Pending proposals are never used.",
+                      isSubtle=True, size="Small", spacing="Medium"))
+    return _card(body)
+
+
+def help_card(params):
+    return _card([
+        _eyebrow("HELP"),
+        _text("Here's what I can do", size="Large", weight="Bolder", spacing="Small"),
+        {"type": "FactSet", "facts": [
+            {"title": "@Spot propose <doc>", "value": "Propose a change to one of your team's docs"},
+            {"title": "@Spot ask <question>", "value": "Ask about approved docs, with citations"},
+            {"title": "@Spot history <doc>", "value": "See approved versions and what isn't binding"},
+            {"title": "@Spot pending", "value": "List changes waiting for approval"},
+        ]},
+        _text("Changes only become binding when an Approver on the dependent team approves them.",
+              isSubtle=True, size="Small"),
+    ])
+
+
+CARDS = {"proposal": proposal_card, "propose_form": propose_form_card,
+         "doc_picker": doc_picker_card, "history": history_card,
+         "answer": answer_card, "help": help_card}
+
+
+# ---------------------------------------------------------------------------
+# @Spot commands and card actions
+# ---------------------------------------------------------------------------
+
+def _match_doc(docs, query):
+    words = _tokens(query)
+    scored = [(len(words & _tokens(d["title"] + " " + d["doc_id"].replace("-", " "))), d)
+              for d in docs]
+    score, doc = max(scored, key=lambda s: s[0], default=(0, None))
+    return doc if score else None
+
+
+def _picker(user, docs, label, prompt, next_action):
+    return {"kind": "doc_picker", "params": {
+        "label": label, "prompt": prompt, "next": next_action,
+        "docs": [{"doc_id": d["doc_id"], "title": d["title"]} for d in docs]}}
+
+
+def handle_command(user, channel, text, post):
+    command = re.sub(r"@spot\b", "", text, flags=re.I).strip()
+    word, _, rest = command.partition(" ")
+    word = word.lower()
     me = db.get_user(user)
-    with st.expander("Propose a change"):
+
+    if word in ("", "help"):
+        _post(channel, "Spot", kind="help", parent=post)
+    elif word == "propose":
         if me["role"] not in ("Contributor", "Approver"):
-            st.caption(f"{user} is a {me['role']} and can't propose changes.")
+            _post(channel, "Spot", f"{user}, you're a **{me['role']}** on {me['team']}, so you "
+                                   "can't propose changes. Ask a Contributor or Approver.",
+                  parent=post)
             return
-        own = {d["doc_id"]: d for d in db.get_docs_for_user(user) if d["team"] == me["team"]}
-        doc_id = st.selectbox("Doc", list(own), key="propose_doc",
-                              format_func=lambda i: f"{own[i]['title']} (v{own[i]['version']})")
-        doc = own[doc_id]
-        with st.form(f"propose_{doc_id}_v{doc['version']}", clear_on_submit=True):
-            content = st.text_area("New content", value=doc["content"], height=150)
-            summary = st.text_input("Summary of the change")
-            deadline = st.date_input("Approval deadline", value=date.today() + timedelta(days=7))
-            if st.form_submit_button("Propose", type="primary"):
-                if not summary.strip() or content.strip() == doc["content"].strip():
-                    st.warning("Change the content and add a summary.")
-                    return
-                try:
-                    pid = governance.propose(user, doc_id, content, summary, deadline.isoformat())
-                except PermissionError as e:
-                    st.error(f"Blocked: {e}")
-                    return
-                routed = next(p for p in db.get_pending() if p["proposal_id"] == pid)
-                st.session_state.flash = (f"Proposal sent. "
-                                          f"{routing_line(routed, doc)}")
-                st.rerun()
+        own = [d for d in db.get_docs_for_user(user) if d["team"] == me["team"]]
+        doc = _match_doc(own, rest)
+        if doc:
+            _post(channel, "Spot", kind="propose_form", params={"doc_id": doc["doc_id"]},
+                  parent=post)
+        else:
+            _post(channel, "Spot", parent=post, **_picker(
+                user, own, "Propose a change", "Which doc do you want to change?",
+                "pick_propose"))
+    elif word == "history":
+        docs = db.get_docs_for_user(user)
+        doc = _match_doc(docs, rest)
+        if doc:
+            _post(channel, "Spot", kind="history", params={"doc_id": doc["doc_id"]}, parent=post)
+        else:
+            _post(channel, "Spot", parent=post, **_picker(
+                user, docs, "History", "Which doc's history?", "pick_history"))
+    elif word == "pending":
+        pending = db.get_pending()
+        if not pending:
+            _post(channel, "Spot", "Nothing is waiting for approval.", parent=post)
+        for p in pending:
+            _post(channel, "Spot", kind="proposal", parent=post,
+                  params={"proposal_id": p["proposal_id"], "doc_id": p["doc_id"],
+                          "old_content": db.get_doc(p["doc_id"])["content"]})
+    else:
+        question = rest if word == "ask" else command
+        try:
+            result = rag.ask(user, question)
+        except Exception as e:  # keep the demo alive if the LLM call fails
+            _post(channel, "Spot", f"Sorry, I couldn't reach the language model ({e}).",
+                  parent=post)
+            return
+        _post(channel, "Spot", kind="answer", params=result, parent=post)
 
 
-def render_history(user):
-    """History tab: pick a doc, show approved versions, then pending/rejected
-    proposals labeled "Not approved: not binding." Returns None."""
-    docs = {d["doc_id"]: d for d in db.get_docs_for_user(user)}
-    if not docs:
-        st.caption("No documents visible to you.")
-        return
-    doc_id = st.selectbox("Document", list(docs), key="history_doc",
-                          format_func=lambda i: f"{docs[i]['title']} ({docs[i]['team']})")
-    doc = docs[doc_id]
-    st.markdown(f"**Current: v{doc['version']}**, approved by {doc['approver']}")
-
-    st.markdown("##### Approved versions")
-    st.dataframe(
-        [{"Version": h["version"], "Changed by": h["changed_by"],
-          "Approved by": h["approved_by"], "Summary": h["summary"],
-          "Deadline": h["deadline"] or "", "Date": (h["changed_at"] or "")[:10]}
-         for h in db.get_history(doc_id)],
-        hide_index=True, width="stretch")
-
-    open_or_rejected = [p for p in db.get_proposals(doc_id) if p["status"] != "approved"]
-    if open_or_rejected:
-        st.markdown("##### Not approved: not binding")
-        for p in open_or_rejected:
-            with st.container(border=True):
-                st.markdown(f"**{p['status'].capitalize()}** · Not approved: not binding.")
-                st.caption(f"{p['summary']} · proposed by {p['proposed_by']} · "
-                           f"needs {p['required_team']} · deadline {p['deadline']}")
-
-
-def render_chat(user):
-    """Chat tab: question box, calls rag.ask, shows answer and sources. Returns None."""
-    log = st.session_state.setdefault(f"chat_{user}", [])
-    st.caption("Answers come only from approved documents you can see. "
-               "Pending proposals are never used.")
-    with st.form("ask_form", clear_on_submit=True):
-        question = st.text_input("Ask Spot", placeholder="What is the cutover date for "
-                                                         "the UAE identity service?")
-        if st.form_submit_button("Ask", type="primary") and question.strip():
-            with st.spinner("Reading approved docs..."):
-                log.append({"question": question, **rag.ask(user, question)})
-    for turn in reversed(log):
-        with st.chat_message("user"):
-            st.markdown(turn["question"])
-        with st.chat_message("assistant", avatar="📍"):
-            st.markdown(turn["answer"])
-            if turn["sources"]:
-                st.markdown("".join(
-                    f'<span class="chip">📄 {escape(s["title"])} · v{s["version"]} · '
-                    f'by {escape(s["author"])} · approved by {escape(str(s["approver"]))}</span>'
-                    for s in turn["sources"]), unsafe_allow_html=True)
+def handle_action(user, channel, message_id, data):
+    """Runs a card button. Returns an error string, or None on success."""
+    post, msg = _find_post(channel, message_id)
+    action = data.get("action")
+    if action == "pick_propose":
+        msg.update(kind="propose_form", params={"doc_id": data["doc_id"]})
+    elif action == "pick_history":
+        msg.update(kind="history", params={"doc_id": data["doc_id"]})
+    elif action == "submit_proposal":
+        doc = db.get_doc(data["doc_id"])
+        if data.get("new_content", "").strip() == doc["content"].strip():
+            return "Nothing changed. Edit the content before submitting."
+        pid = governance.propose(user, doc["doc_id"], data["new_content"],
+                                 data["summary"], data["deadline"])
+        p = next(x for x in db.get_pending() if x["proposal_id"] == pid)
+        msg.update(kind="proposal", params={"proposal_id": pid, "doc_id": doc["doc_id"],
+                                            "old_content": doc["content"]})
+        target = TEAM_CHANNEL.get(p["required_team"])
+        where = (f" I've asked them in **{p['required_team']} › General**."
+                 if target and target != channel else "")
+        _post(channel, "Spot", f"Routed to **{_routing(p, doc)}**.{where}", parent=post)
+        _announce(p, doc["content"], skip_channel=channel)
+    elif action == "approve":
+        version = governance.approve(user, data["proposal_id"])
+        doc = db.get_doc(data["doc_id"])
+        _post(channel, "Spot", f"**{user}** approved. **{doc['title']}** is now "
+                               f"**v{version}** and recorded in History.", parent=post)
+    elif action == "reject":
+        governance.reject(user, data["proposal_id"])
+        _post(channel, "Spot", f"**{user}** rejected this change. It is not binding.",
+              parent=post)
+    return None
 
 
 # ---------------------------------------------------------------------------
-# Teams look: fake Teams shell around the app. Cosmetic only; cut first.
+# HTTP API for static/spot.js
 # ---------------------------------------------------------------------------
 
-TEAMS_CSS = """<style>
-html, body, [class*="css"], .stApp, button, input, textarea {
-  font-family: "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif; }
-#MainMenu, footer, [data-testid="stDecoration"], [data-testid="stToolbarActions"],
-[data-testid="stAppDeployButton"] { display: none; }
-header[data-testid="stHeader"] { background: transparent; }
-.block-container { padding: 2.6rem 1.5rem 2rem; max-width: 100%; }
-[data-testid="stSidebar"] { background: #E1DFDD; border-right: 2px dashed #A19F9D; }
-.t-top { display: flex; align-items: center; gap: 16px; background: #464775; color: #fff;
-  margin: -1.2rem -1rem 0.8rem; padding: 8px 16px; border-radius: 6px; }
-.t-brand { font-weight: 600; font-size: 14px; white-space: nowrap; }
-.t-search { flex: 1; max-width: 520px; margin: 0 auto; background: #ffffff26; border-radius: 4px;
-  padding: 5px 12px; font-size: 13px; color: #ffffffcc; }
-.t-me { width: 30px; height: 30px; border-radius: 50%; background: #E8EBFA; color: #464775;
-  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
-.t-rail { display: flex; flex-direction: column; gap: 6px; background: #EBEBEB;
-  border-radius: 6px; padding: 8px 0; }
-.t-ri { position: relative; text-align: center; font-size: 10px; color: #616161; padding: 6px 0; }
-.t-ri .ico { display: block; font-size: 20px; filter: grayscale(1); }
-.t-ri.on { color: #5B5FC7; font-weight: 600; border-left: 3px solid #5B5FC7; }
-.t-ri.on .ico { filter: none; }
-.t-badge { position: absolute; top: 2px; right: 22%; background: #C4314B; color: #fff;
-  border-radius: 8px; font-size: 10px; padding: 0 5px; font-weight: 700; }
-.t-app { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-.t-logo { width: 32px; height: 32px; border-radius: 6px; background: #5B5FC7; color: #fff;
-  display: flex; align-items: center; justify-content: center; font-weight: 700; }
-.t-title { font-weight: 700; font-size: 18px; line-height: 1.1; }
-.t-sub { font-size: 12px; color: #616161; }
-.stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 1px solid #E0E0E0; }
-.stTabs [data-baseweb="tab"] { font-weight: 600; }
-[class*="st-key-card_"] { background: #fff; border-radius: 8px !important;
-  box-shadow: 0 2px 4px #00000024; border: 1px solid #E0E0E0 !important; }
-.ac-head { display: flex; justify-content: space-between; font-size: 12px; color: #616161; }
-.ac-title { font-size: 16px; font-weight: 700; margin-top: 4px; }
-.ac-sub { font-size: 14px; margin: 2px 0 8px; }
-.ac-facts td { padding: 2px 16px 2px 0; font-size: 13px; border: none; vertical-align: top; }
-.ac-facts td:first-child { font-weight: 600; white-space: nowrap; }
-.ac-facts table, .ac-facts tr { border: none; }
-.ac-doc { font-size: 12px; font-weight: 600; color: #616161; margin-bottom: 2px; }
-.ac-pre { background: #FAFAFA; border: 1px solid #E0E0E0; border-radius: 4px; padding: 8px;
-  font-family: Consolas, monospace; font-size: 13px; white-space: pre-wrap; }
-.ac-pre .del { background: #FDE7E9; text-decoration: line-through; }
-.ac-pre .add { background: #E7F2DA; }
-.chip { display: inline-block; background: #E8EBFA; color: #464775; border-radius: 12px;
-  padding: 2px 10px; font-size: 12px; margin: 2px 4px 0 0; }
-</style>"""
+app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 
-def render_top_bar(me):
-    initials = me["name"][:2].upper()
-    st.markdown(
-        '<div class="t-top"><div class="t-brand">Teams</div>'
-        '<div class="t-search">🔍 Search</div>'
-        f'<div class="t-me" title="{me["name"]}">{initials}</div></div>',
-        unsafe_allow_html=True)
+def _render(msg):
+    out = {k: msg[k] for k in ("id", "author", "text", "ts")}
+    out["card"] = CARDS[msg["kind"]](msg["params"]) if msg["kind"] else None
+    return out
 
 
-def render_rail(me):
-    waiting = sum(1 for p in db.get_pending() if p["required_team"] == me["team"])
-    badge = f'<span class="t-badge">{waiting}</span>' if waiting else ""
-    items = [("🔔", "Activity", badge, ""), ("💬", "Chat", "", ""), ("👥", "Teams", "", ""),
-             ("📅", "Calendar", "", ""), ("📍", "Spot", "", " on")]
-    st.markdown(
-        '<div class="t-rail">' + "".join(
-            f'<div class="t-ri{on}"><span class="ico">{ico}</span>{label}{b}</div>'
-            for ico, label, b, on in items) + "</div>",
-        unsafe_allow_html=True)
+def _channel_view(user, channel):
+    SEEN[(user, channel)] = len(POSTS[channel])
+    return [dict(_render(p), replies=[_render(r) for r in p["replies"]])
+            for p in POSTS[channel]]
 
 
-def render_app_header(me):
-    st.markdown(
-        '<div class="t-app"><div class="t-logo">S</div><div>'
-        '<div class="t-title">Spot</div>'
-        f'<div class="t-sub">Requirements version control · {escape(me["team"])}</div>'
-        '</div></div>',
-        unsafe_allow_html=True)
+def _state(user):
+    me = db.get_user(user)
+    pending = [p for p in db.get_pending() if p["required_team"] == me["team"]]
+    activity = []
+    for p in pending:
+        doc = db.get_doc(p["doc_id"])
+        activity.append({"channel": TEAM_CHANNEL.get(me["team"]), "summary": p["summary"],
+                         "doc": doc["title"], "proposed_by": p["proposed_by"],
+                         "ts": p["created_at"]})
+    channels = [dict(c, unread=max(0, len(POSTS[c["id"]]) - SEEN.get((user, c["id"]), 0)))
+                for c in CHANNELS]
+    return {"me": me, "users": [db.get_user(u) for u in USERS],
+            "channels": channels, "activity": activity}
 
 
-def diff_html(old, new):
-    """Old and new content as two <div>s, changed lines highlighted."""
-    old_lines, new_lines = old.splitlines(), new.splitlines()
+@app.get("/")
+def index():
+    return send_from_directory("static", "index.html")
 
-    def block(lines, other, cls):
-        return '<div class="ac-pre">' + "<br>".join(
-            f'<span class="{cls}">{escape(l)}</span>' if l not in other else escape(l)
-            for l in lines) + "</div>"
 
-    return block(old_lines, set(new_lines), "del"), block(new_lines, set(old_lines), "add")
+@app.get("/api/state")
+def api_state():
+    return jsonify(_state(request.args["user"]))
+
+
+@app.get("/api/channel/<channel>")
+def api_channel(channel):
+    return jsonify({"posts": _channel_view(request.args["user"], channel)})
+
+
+@app.post("/api/post")
+def api_post():
+    body = request.get_json()
+    user, channel, text = body["user"], body["channel"], body["text"].strip()
+    post = _post(channel, user, text)
+    if re.search(r"@spot\b", text, flags=re.I):
+        handle_command(user, channel, text, post)
+    return jsonify({"posts": _channel_view(user, channel)})
+
+
+@app.post("/api/action")
+def api_action():
+    body = request.get_json()
+    user, channel = body["user"], body["channel"]
+    try:
+        error = handle_action(user, channel, body["message_id"], body["data"])
+    except PermissionError as e:
+        error = str(e)
+    return jsonify({"posts": _channel_view(user, channel), "error": error})
+
+
+@app.post("/api/reset")
+def api_reset():
+    db.reset()
+    reset_ui()
+    return jsonify({"ok": True})
 
 
 def main():
-    """Page setup, sidebar, and the three tabs. Returns None."""
-    st.set_page_config(page_title="Spot", page_icon="📍", layout="wide")
-    st.markdown(TEAMS_CSS, unsafe_allow_html=True)
-    user = render_sidebar()
-    me = db.get_user(user)
-    render_top_bar(me)
-    rail, body = st.columns([1, 13], gap="small")
-    with rail:
-        render_rail(me)
-    with body:
-        render_app_header(me)
-        approvals, history, chat = st.tabs(["Approvals", "History", "Ask Spot"])
-        with approvals:
-            render_pending(user)
-        with history:
-            render_history(user)
-        with chat:
-            render_chat(user)
+    try:
+        db.get_pending()
+    except Exception:  # first run against the real db: create and seed it
+        db.reset()
+    reset_ui()
+    app.run(host="127.0.0.1", port=8501, debug=False)
 
 
 if __name__ == "__main__":
