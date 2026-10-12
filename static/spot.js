@@ -23,7 +23,7 @@ const COMMANDS = [
 ];
 
 const S = {
-  user: store("spot.user2") || "marcus.chen",
+  user: store("spot.user2") || window.DEMO_DEFAULT_USER || "marcus.chen",
   view: "teams",                  // activity | chat | teams | spot
   loc: store("spot.loc") || "chat:cutover-sync",
   spotTab: "pending",             // pending | history | chat
