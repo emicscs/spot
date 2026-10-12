@@ -535,9 +535,8 @@ def _state(user):
                       "name": c["name"] or ", ".join(_name(m) for m in others)})
     for c in chats:
         posts = _posts(c["location"])
-        last = posts[-1] if posts else None
-        if last and last["replies"]:
-            last = last["replies"][-1]
+        last = max((m for post in posts for m in [post] + post["replies"]),
+                   key=lambda m: m["ts"], default=None)
         c["unread"] = _unread(user, c["location"])
         c["preview"] = last and {"author": last["author"], "ts": last["ts"],
                                  "text": last["text"] or "Sent a card"}

@@ -314,11 +314,12 @@ function renderHead() {
   }
   $("#head").innerHTML = mobile + content;
 }
-function messageEl(m, loc, small) {
+function messageEl(m, loc, small, replyParent = null) {
   const el = document.createElement("div");
   if (m.kind === "system") { el.className = "system"; el.innerHTML = `${icon("people_20_regular", "sm")}<span>${esc(m.text)}</span>`; return el; }
   el.className = "msg";
-  el.innerHTML = `${avatar(m.author, small ? "sm" : "")}<div class="msg-body"><div class="msg-head"><button class="person-button" data-person="${esc(m.author)}" title="${esc(personTitle(m.author))}">${esc(person(m.author).display_name)}</button>${m.author === "spot" ? '<span class="tag">APP</span>' : ""}<time datetime="${esc(m.ts)}" title="${esc(fullDate(m.ts))}">${time(m.ts)}</time></div>${m.text ? `<div class="msg-text">${md(m.text)}</div>` : ""}</div>`;
+  const quote = replyParent && m.author !== "spot" ? `<div class="reply-quote"><button class="quoted-author" data-jump="${esc(replyParent.id)}">${esc(person(replyParent.author).display_name)}</button><div>${esc((replyParent.text || "Shared a card").slice(0, 240))}${(replyParent.text || "").length > 240 ? "…" : ""}</div></div>` : "";
+  el.innerHTML = `${avatar(m.author, small ? "sm" : "")}<div class="msg-body"><div class="msg-head"><button class="person-button" data-person="${esc(m.author)}" title="${esc(personTitle(m.author))}">${esc(person(m.author).display_name)}</button>${m.author === "spot" ? '<span class="tag">APP</span>' : ""}<time datetime="${esc(m.ts)}" title="${esc(fullDate(m.ts))}">${time(m.ts)}</time></div>${m.text ? `<div class="msg-text">${quote}${md(m.text)}</div>` : ""}</div>`;
   const body = el.querySelector(".msg-body");
   if (m.card) body.appendChild(cardHost(m.card, m.id, loc));
   if (S.errors[m.id]) body.insertAdjacentHTML("beforeend", errorBox(S.errors[m.id]));
@@ -328,12 +329,41 @@ function renderFeed(scroll) {
   const feed = $("#feed"), keep = feed.scrollTop, loc = currentLoc();
   const inner = document.createElement("div"); inner.className = "feed-inner";
   if (loc.startsWith("spot:")) inner.innerHTML = `<div class="spot-welcome"><div class="spot-welcome-top">${avatar("spot", "lg")}<div><h2>A little clarity goes a long way.</h2><p>Ask a question. Capture a change. Keep a receipt.</p></div></div><div class="quick-prompts"><button class="quick-prompt" data-prompt="ask What is the cutover date for the UAE identity service?">What's the UAE identity cutover date?</button><button class="quick-prompt" data-prompt="pending">Review pending changes</button><button class="quick-prompt" data-prompt="help">What can Spot do?</button></div></div>`;
-  else inner.innerHTML = `<div class="conversation-intro">${icon("people_20_regular", "sm")}You're up to date with this conversation</div>`;
   const posts = S.posts.map((p) => ({ ...p, replies: [...p.replies] }));
   if (S.pending) {
     const mine = { id: "pending", author: S.user, text: S.pending.text, ts: new Date().toISOString(), replies: [] };
     const parent = posts.find((p) => p.id === S.pending.parent);
     if (parent) parent.replies.push(mine); else posts.push(mine);
+  }
+  if (!loc.startsWith("channel:")) {
+    // Teams chats are one chronological stream; channel posts keep nested threads.
+    const entries = posts.flatMap((post) => [
+      { message: post, parent: null, rootId: post.id },
+      ...post.replies.map((message) => ({ message, parent: post, rootId: post.id })),
+    ]).sort((a, b) => new Date(a.message.ts) - new Date(b.message.ts));
+    let day = "", previous = null;
+    for (const { message, parent, rootId } of entries) {
+      const messageDay = new Date(message.ts).toDateString();
+      if (messageDay !== day) {
+        const date = document.createElement("div"); date.className = "day";
+        date.textContent = fullDate(message.ts); inner.appendChild(date); day = messageDay; previous = null;
+      }
+      if (message.kind === "system") {
+        inner.appendChild(messageEl(message, loc)); previous = null; continue;
+      }
+      const continued = previous && previous.author === message.author && new Date(message.ts) - new Date(previous.ts) < 120000;
+      const box = document.createElement("div");
+      box.className = `post${message.author === S.user ? " own" : ""}${continued ? " continued" : ""}`;
+      box.dataset.id = message.id;
+      box.appendChild(messageEl(message, loc, false, parent));
+      box.insertAdjacentHTML("beforeend", `<button class="reply-link" data-reply="${rootId}">${icon("arrow_reply_20_regular", "xs")}Reply</button>`);
+      inner.appendChild(box); previous = message;
+    }
+    if (!entries.length) inner.insertAdjacentHTML("beforeend", empty("Start the conversation", "Share an update or mention @Spot to ask a question.", "chat_24_regular"));
+    if (S.pending?.typing) inner.insertAdjacentHTML("beforeend", typingHtml(false));
+    feed.replaceChildren(inner);
+    feed.scrollTop = scroll === "keep" ? keep : scroll === "top" ? 0 : feed.scrollHeight;
+    return;
   }
   let day = "";
   for (const post of posts) {
@@ -450,7 +480,7 @@ function renderSearch() {
   const people = Object.values(S.state.people).filter((p) => matching(p.display_name) || matching(p.team));
   const docs = S.documents.filter((d) => matching(d.title) || matching(d.content));
   const inConversation = S.view !== "activity" && (S.view !== "spot" || S.spotTab === "chat") && (S.view === "spot" || S.contentTab === "conversation");
-  const messages = (inConversation ? S.posts : []).flatMap((p) => [p, ...p.replies].map((m) => ({ ...m, parent: p.id }))).filter((m) => matching(m.text));
+  const messages = (inConversation ? S.posts : []).flatMap((p) => [p, ...p.replies].map((m) => ({ ...m, parent: currentLoc().startsWith("channel:") ? p.id : m.id }))).filter((m) => matching(m.text));
   const group = (label, items) => items.length ? `<div class="section">${label}</div>${items.slice(0, 5).join("")}` : "";
   results.innerHTML = group("Conversations", chats.map((c) => `<button class="search-result" data-loc="${c.location}">${chatAvatar(c)}<div><strong>${esc(c.name)}</strong><small>${c.kind === "bot" ? "App" : `${c.members.length} members`}</small></div></button>`)) + group("Channels", channels.map((c) => `<button class="search-result" data-loc="${c.location}">${icon("people_team_24_regular")}<div><strong>${esc(c.name)}</strong><small>${esc(c.team)}</small></div></button>`)) + group("In this conversation", messages.map((m) => `<button class="search-result" data-jump="${esc(m.parent)}">${avatar(m.author, "sm")}<div><strong>${esc(person(m.author).display_name)}</strong><small>${esc(m.text.slice(0, 150))}</small></div></button>`)) + group("Approved files", docs.map((d) => `<button class="search-result" data-doc="${esc(d.doc_id)}">${icon("contact_card_24_regular")}<div><strong>${esc(d.title)}</strong><small>Version ${d.version} · ${esc(d.team)}</small></div></button>`)) + group("People", people.map((p) => `<button class="search-result" data-person="${esc(p.name)}">${avatar(p.name, "sm")}<div><strong>${esc(p.display_name)}</strong><small>${esc(p.title)}</small></div></button>`));
   if (!results.innerHTML) results.innerHTML = `<div class="search-empty">No results for “${esc($("#search").value.trim())}”. Try a person, channel, or requirement.</div>`;

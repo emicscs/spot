@@ -2962,3 +2962,82 @@ img {
     font-size: 14px;
   }
 }
+
+/* Chat replies are quoted messages; only channels use the threaded post layout. */
+.reply-quote {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--subtle);
+  border-radius: 3px;
+  background: var(--hover);
+  color: var(--subtle);
+  font-size: 14px;
+  line-height: 20px;
+  white-space: normal;
+  max-width: 620px;
+}
+
+.quoted-author {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+  font-size: inherit;
+  text-align: left;
+}
+
+.quoted-author:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.chat-feed .post.own {
+  align-self: flex-end;
+  max-width: 85%;
+}
+
+.chat-feed .post.own>.msg>.av {
+  display: none;
+}
+
+.chat-feed .post.own>.msg>.msg-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.chat-feed .post.own>.msg>.msg-body>.msg-head:after {
+  content: none;
+}
+
+.chat-feed .post.own>.msg>.msg-body>.msg-text {
+  background: var(--brand-bg);
+}
+
+.chat-feed .post.own>.reply-link {
+  margin-left: auto;
+  padding-left: 0;
+}
+
+.chat-feed .post.continued>.msg>.av {
+  visibility: hidden;
+  margin-top: 0;
+}
+
+.chat-feed .post.continued>.msg>.msg-body>.msg-head {
+  display: none;
+}
+
+.chat-feed .post.continued {
+  margin-top: -10px;
+}
+
+@media(max-width:760px) {
+  .reply-quote {
+    font-size: 12px;
+    line-height: 18px;
+    padding: 7px 9px;
+  }
+  .chat-feed .post.own {
+    max-width: 94%;
+  }
+}
