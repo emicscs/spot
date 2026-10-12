@@ -54,10 +54,10 @@ Rules:
 - Docs change only through approve().
 
 Fixed seed data (workspace.py messages link to these, so use these exact values):
-- Doc "ops-uae-identity": title "UAE Identity Service: Scope", team "Ops Automation", v1 says cutover date 2026-11-02.
-- Doc "ops-uae-gateway": title "UAE Gateway: Cutover Plan", team "Ops Automation", v1 says gateway cutover 2026-11-16.
-- Proposal "3f2b8c1e-7a4d-4e9b-9c2f-5d1a6b8e0c47" (pending): doc "ops-uae-identity", summary "UAE identity service cutover moved two weeks", new content moves the cutover to 2026-11-16, proposed_by "marcus.chen", required_team "Payments", deadline "2026-10-16".
-- Proposal "a91d4f60-2c3b-4b7e-8f15-6e0c9d2b7a38" (pending, never approved): doc "ops-uae-gateway", summary "Move UAE gateway cutover up one week", new content moves the gateway cutover to 2026-11-09, proposed_by "marcus.chen", required_team "Payments", deadline "2026-10-20".
+- Doc "ops-uae-identity": title "UAE Identity Service Integration Scope", team "Ops Automation", v1 says the cutover date for the UAE identity service is November 14, 2026.
+- Doc "ops-uae-gateway": title "UAE Payment Gateway Requirements", team "Ops Automation".
+- Proposal "3f2b8c1e-7a4d-4e9b-9c2f-5d1a6b8e0c47" (pending): doc "ops-uae-identity", summary "UAE identity service cutover moved two weeks", new content moves the cutover to November 28, 2026, proposed_by "marcus.chen", required_team "Payments", deadline "2026-10-16".
+- Proposal "a91d4f60-2c3b-4b7e-8f15-6e0c9d2b7a38" (pending, never approved): doc "ops-uae-gateway", summary "Move UAE gateway cutover up one week", proposed_by "marcus.chen", required_team "Payments", deadline "2026-10-20".
 - Only these two IDs are fixed; proposals created at runtime still use uuid4().
 
 workspace.py (data only, no logic; owned by Frankie): the fictional Mastercard Teams workspace (teams, channels, chats, memberships, the Spot bot user, and 25-40 seed messages). Message fields: message_id, location, author, timestamp, text, thread_parent_id (optional), mentions_spot (bool), proposal_id (optional, one of the fixed IDs above).
