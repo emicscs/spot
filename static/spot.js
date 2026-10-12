@@ -79,7 +79,6 @@ function empty(title, copy, glyph = "checkmark_circle_16_filled") {
 // ---------------------------------------------------------------- Adaptive Cards
 
 const fg = (d, s = d) => ({ default: d, subtle: s });
-const FONT = "'Segoe UI', 'Segoe UI Web (West European)', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif";
 function createCardHostConfig() {
   const style = getComputedStyle(document.documentElement);
   const color = (name) => style.getPropertyValue(name).trim();
@@ -89,11 +88,11 @@ function createCardHostConfig() {
     warning: fg(color("--warning")), attention: fg(color("--red")),
   };
   return new AdaptiveCards.HostConfig({
-    fontFamily: FONT,
+    fontFamily: style.getPropertyValue("--font").trim(),
     supportsInteractivity: true,
     spacing: { small: 4, default: 8, medium: 12, large: 16, extraLarge: 24, padding: 20 },
     separator: { lineThickness: 1, lineColor: color("--stroke") },
-    fontSizes: { small: 11, default: 12, medium: 14, large: 17, extraLarge: 24 },
+    fontSizes: { small: 12, default: 14, medium: 16, large: 18, extraLarge: 24 },
     fontWeights: { lighter: 300, default: 400, bolder: 600 },
     containerStyles: {
       default: { backgroundColor: color("--card"), foregroundColors: colors },
@@ -289,8 +288,11 @@ function renderList() {
   const visibleChats = chats.filter((c) => !unreadOnly || c.unread);
   const chatHtml = visibleChats.map(chatRow).join("");
   const teamsBlock = teamHtml ? `<div class="section">Teams & channels <span>${teams.length}</span></div>${teamHtml}` : "";
-  const chatsBlock = chatHtml ? `<div class="section">${S.view === "chat" ? "Recent conversations" : "Chats"}<span>${visibleChats.length}</span></div>${chatHtml}` : "";
-  $("#list").innerHTML = `<div class="list-head"><h1>${S.view === "chat" ? "Chat" : "Teams"}</h1><button class="icon-button" id="find-conversation" title="Find a conversation" aria-label="Find a conversation">${icon("search_20_regular", "sm")}</button></div><div class="list-filters"><button class="filter-chip ${!unreadOnly ? "on" : ""}" data-filter="all" aria-pressed="${!unreadOnly}">All</button><button class="filter-chip ${unreadOnly ? "on" : ""}" data-filter="unread" aria-pressed="${unreadOnly}">Unread</button></div>` + (S.view === "chat" ? chatsBlock + teamsBlock : teamsBlock + chatsBlock) + (!chatHtml && !teamHtml ? empty("You're all caught up", "No unread conversations.") : "");
+  const favorites = visibleChats.filter((c) => c.kind === "bot").map(chatRow).join("");
+  const conversations = visibleChats.filter((c) => c.kind !== "bot").map(chatRow).join("");
+  const chatsBlock = `${favorites ? `<div class="section">Favorites</div>${favorites}` : ""}${conversations ? `<div class="section">Chats</div>${conversations}` : ""}`;
+  const content = S.view === "chat" ? chatsBlock : teamsBlock;
+  $("#list").innerHTML = `<div class="list-head"><h1>${S.view === "chat" ? "Chat" : "Teams"}</h1><button class="icon-button" id="find-conversation" title="Find a conversation" aria-label="Find a conversation">${icon("search_20_regular")}</button></div><div class="list-filters"><button class="filter-chip ${!unreadOnly ? "on" : ""}" data-filter="all" aria-pressed="${!unreadOnly}">${S.view === "chat" ? "Chats" : "All"}</button><button class="filter-chip ${unreadOnly ? "on" : ""}" data-filter="unread" aria-pressed="${unreadOnly}">Unread</button></div>` + (content || empty("You're all caught up", "No unread conversations."));
 }
 function renderHead() {
   const mobile = `<button class="icon-button sidebar-toggle" id="toggle-sidebar" aria-label="Toggle conversations" aria-expanded="${$("#sidebar").classList.contains("mobile-open")}">${icon("panel_left_20_regular")}</button>`;
@@ -307,8 +309,8 @@ function renderHead() {
     const title = channel ? ch?.name : chat?.name;
     const members = chat?.members || [];
     const sub = channel ? team?.name : chat?.kind === "bot" ? "Requirements version control" : `${members.length} members · Shared conversation`;
-    const tabs = `<nav class="tabs" aria-label="Conversation views">${[["conversation", channel ? "Posts" : "Chat"], ["files", "Files"]].map(([id, label]) => `<button class="tab ${S.contentTab === id ? "on" : ""}" data-content-tab="${id}" ${S.contentTab === id ? 'aria-current="page"' : ""}>${label}</button>`).join("")}</nav>`;
-    content = `${channel && team ? teamTile(team) : chat ? chatAvatar(chat) : ""}<div class="head-copy"><div class="head-title">${esc(title || "Conversation")}</div><div class="head-sub">${esc(sub || "")}</div></div>${tabs}<div class="head-actions">${members.length > 1 ? `<button class="member-stack" id="members" title="View ${members.length} members" aria-label="View ${members.length} members">${members.slice(0, 3).map((u) => avatar(u, "sm")).join("")}<span class="member-count">${members.length}</span></button><span class="head-divider"></span>` : ""}<button class="icon-button" id="conversation-search" title="Search this conversation" aria-label="Search this conversation">${icon("search_20_regular")}</button><button class="icon-button" id="conversation-info" title="Conversation details" aria-label="Conversation details">${icon("info_16_regular")}</button></div>`;
+    const tabs = `<nav class="tabs" aria-label="Conversation views">${[["conversation", channel ? "Posts" : "Chat"], ["files", channel ? "Files" : "Shared"]].map(([id, label]) => `<button class="tab ${S.contentTab === id ? "on" : ""}" data-content-tab="${id}" ${S.contentTab === id ? 'aria-current="page"' : ""}>${label}</button>`).join("")}</nav>`;
+    content = `${channel && team ? teamTile(team) : chat ? chatAvatar(chat) : ""}<div class="head-copy"><div class="head-title">${esc(title || "Conversation")}</div>${channel || chat?.kind === "bot" ? `<div class="head-sub">${esc(sub || "")}</div>` : ""}</div>${tabs}<div class="head-actions">${members.length > 1 ? `<button class="member-stack" id="members" title="View ${members.length} members" aria-label="View ${members.length} members">${icon("people_20_regular")}<span class="member-count">${members.length}</span></button><span class="head-divider"></span>` : ""}<button class="icon-button" id="conversation-search" title="Search this conversation" aria-label="Search this conversation">${icon("search_20_regular")}</button><button class="icon-button" id="conversation-info" title="Conversation details" aria-label="Conversation details">${icon("info_16_regular")}</button></div>`;
   }
   $("#head").innerHTML = mobile + content;
 }

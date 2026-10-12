@@ -27,7 +27,7 @@ Demo users: Marcus Chen (Ops Automation, Contributor), Priya Raman (Ops Automati
 
 The workspace includes local profile portraits, searchable conversations and approved
 files (Ctrl/Cmd + K), member profiles, conversation drafts, and responsive navigation.
-The **Files** tab shows approved documents available to the signed-in user's team;
+The **Shared** tab in chats (**Files** in channels) shows approved documents available to the signed-in user's team;
 open a document to read its current version or jump to its history. The profile
 menu in the top bar switches demo users and shows their team and approval role.
 Portrait sources are recorded in [static/avatars/README.md](static/avatars/README.md).
