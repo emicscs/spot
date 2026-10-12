@@ -1,268 +1,155 @@
-"""Spot UI: a Microsoft Teams lookalike. Owner: Frankie. See CONTRACTS.md.
+"""Spot UI: a Microsoft Teams lookalike for a fictional Mastercard workspace. Owner: Frankie.
 
 Run: python app.py, then open http://localhost:8501
-The page in static/ emulates a Teams channel. You talk to Spot by typing
-"@Spot <command>"; Spot replies with Adaptive Cards built in this file.
-Build against fake return values first (USE_FAKES = True); swap in the real
-db, governance and rag at integration.
+Teams, channels, chats and seed messages come from workspace.py. Spot is a bot:
+mention "@Spot" in any channel or chat (or talk to it directly in the Spot app)
+and it replies with Adaptive Cards built here. All data goes through the
+contract functions in db, governance and rag. See CONTRACTS.md.
 """
+import difflib
 import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from types import SimpleNamespace
 
 from flask import Flask, jsonify, request, send_from_directory
 
-# Flip to False at integration (1:05) to use the real db, governance and rag.
-USE_FAKES = True
+import db
+import governance
+import rag
+import workspace
 
-
-# ---------------------------------------------------------------------------
-# Fake backend: same signatures and return shapes as CONTRACTS.md, kept in
-# memory so propose/approve/reject actually change what you see.
-# ---------------------------------------------------------------------------
-
-FAKE_USERS = {
-    "alice": {"name": "alice", "team": "Ops Automation", "role": "Approver"},
-    "bob": {"name": "bob", "team": "Ops Automation", "role": "Contributor"},
-    "carol": {"name": "carol", "team": "Payments", "role": "Reader"},
-    "dave": {"name": "dave", "team": "Payments", "role": "Approver"},
-}
+CORE_USERS = ["marcus.chen", "priya.raman", "daniel.okafor", "elena.rossi"]
+# Where Spot posts approval requests for each contract team.
+TEAM_HOME = {"Ops Automation": "channel:ops-general", "Payments": "channel:pay-general"}
 
 
 def _now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _fake_seed():
-    def doc(doc_id, title, team, content, author, approver):
-        return {"doc_id": doc_id, "title": title, "team": team, "content": content,
-                "version": 1, "author": author, "approver": approver,
-                "updated_at": "2026-10-01T09:00:00+00:00"}
-
-    docs = [
-        doc("ops-uae-identity", "UAE Identity Service: Scope", "Ops Automation",
-            "Scope: migrate UAE identity verification to the regional service.\n"
-            "Cutover date: 2026-11-02.\n"
-            "Out of scope: card tokenization.", "bob", "alice"),
-        doc("ops-uae-gateway", "UAE Gateway: Cutover Plan", "Ops Automation",
-            "Gateway cutover: 2026-11-16.\n"
-            "Rollback window: 48 hours.", "alice", "alice"),
-        doc("pay-settlement", "Payments: UAE Settlement Requirements", "Payments",
-            "Settlement must run on the regional identity service after cutover.\n"
-            "Depends on: UAE Identity Service.", "dave", "dave"),
-    ]
-    history = [{"doc_id": d["doc_id"], "version": 1, "content": d["content"],
-                "changed_by": d["author"], "approved_by": d["approver"],
-                "summary": "Initial version", "deadline": None,
-                "changed_at": d["updated_at"]} for d in docs]
-    proposals = [{
-        "proposal_id": str(uuid.uuid4()), "doc_id": "ops-uae-gateway",
-        "new_content": "Gateway cutover: 2026-11-09.\nRollback window: 48 hours.",
-        "summary": "Move UAE gateway cutover up one week", "deadline": "2026-10-20",
-        "proposed_by": "bob", "required_team": "Payments", "status": "pending",
-        "approved_by": None, "created_at": "2026-10-10T14:00:00+00:00",
-    }]
-    return {"docs": {d["doc_id"]: d for d in docs}, "history": history,
-            "proposals": proposals, "deps": [("Payments", "Ops Automation")]}
+def _user(name):
+    if name == "spot":
+        return workspace.SPOT_BOT
+    return db.get_user(name) or {"name": name, "display_name": name, "title": "",
+                                 "team": None, "role": "", "avatar_color": "#616161"}
 
 
-_FAKE = _fake_seed()
-
-
-def _fake_get_user(name):
-    return FAKE_USERS.get(name)
-
-
-def _fake_get_doc(doc_id):
-    d = _FAKE["docs"].get(doc_id)
-    return dict(d) if d else None
-
-
-def _fake_get_docs_for_user(name):
-    user = _fake_get_user(name)
-    teams = {user["team"]} | {dep for t, dep in _FAKE["deps"] if t == user["team"]}
-    return [dict(d) for d in _FAKE["docs"].values() if d["team"] in teams]
-
-
-def _fake_get_history(doc_id):
-    rows = [dict(h) for h in _FAKE["history"] if h["doc_id"] == doc_id]
-    return sorted(rows, key=lambda h: h["version"], reverse=True)
-
-
-def _fake_get_proposals(doc_id):
-    return [dict(p) for p in _FAKE["proposals"] if p["doc_id"] == doc_id]
-
-
-def _fake_get_pending():
-    return [dict(p) for p in _FAKE["proposals"] if p["status"] == "pending"]
-
-
-def _fake_get_dependent_teams(team):
-    return [t for t, dep in _FAKE["deps"] if dep == team]
-
-
-def _fake_reset():
-    global _FAKE
-    _FAKE = _fake_seed()
-
-
-def _fake_propose(user, doc_id, new_content, summary, deadline):
-    u, doc = _fake_get_user(user), _FAKE["docs"][doc_id]
-    if u["role"] not in ("Contributor", "Approver"):
-        raise PermissionError(f"{user} is a {u['role']}; only Contributors and Approvers can propose")
-    if u["team"] != doc["team"]:
-        raise PermissionError(f"Only {doc['team']} can propose changes to {doc['title']}")
-    dependents = _fake_get_dependent_teams(doc["team"])
-    proposal_id = str(uuid.uuid4())
-    _FAKE["proposals"].append({
-        "proposal_id": proposal_id, "doc_id": doc_id, "new_content": new_content,
-        "summary": summary, "deadline": deadline, "proposed_by": user,
-        "required_team": dependents[0] if dependents else doc["team"],
-        "status": "pending", "approved_by": None, "created_at": _now(),
-    })
-    return proposal_id
-
-
-def _fake_check_reviewer(user, p):
-    u, doc = _fake_get_user(user), _FAKE["docs"][p["doc_id"]]
-    if p["status"] != "pending":
-        raise PermissionError(f"This proposal is already {p['status']}")
-    if u["team"] != p["required_team"]:
-        why = (f"{p['required_team']} depends on {doc['team']}"
-               if p["required_team"] != doc["team"] else "no other team depends on it")
-        raise PermissionError(f"Only {p['required_team']} can approve: {why}")
-    if u["role"] != "Approver":
-        raise PermissionError(f"{user} is a {u['role']}; only Approvers can approve or reject")
-
-
-def _fake_find(proposal_id):
-    return next(p for p in _FAKE["proposals"] if p["proposal_id"] == proposal_id)
-
-
-def _fake_approve(user, proposal_id):
-    p = _fake_find(proposal_id)
-    _fake_check_reviewer(user, p)
-    doc = _FAKE["docs"][p["doc_id"]]
-    doc.update(content=p["new_content"], version=doc["version"] + 1,
-               approver=user, updated_at=_now())
-    _FAKE["history"].append({
-        "doc_id": doc["doc_id"], "version": doc["version"], "content": p["new_content"],
-        "changed_by": p["proposed_by"], "approved_by": user, "summary": p["summary"],
-        "deadline": p["deadline"], "changed_at": doc["updated_at"],
-    })
-    p.update(status="approved", approved_by=user)
-    return doc["version"]
-
-
-def _fake_reject(user, proposal_id):
-    p = _fake_find(proposal_id)
-    _fake_check_reviewer(user, p)
-    p["status"] = "rejected"
+def _name(name):
+    return _user(name)["display_name"] if name else ""
 
 
 def _tokens(text):
-    return {w.strip("?.,:()").lower() for w in text.split() if len(w) > 3}
+    return {w.strip("?.,:()!").lower() for w in text.split() if len(w) > 3}
 
 
-def _fake_ask(user, question):
-    words = _tokens(question)
-    scored = [(len(words & _tokens(d["title"] + " " + line)), line, d)
-              for d in _fake_get_docs_for_user(user) for line in d["content"].splitlines()]
-    score, line, d = max(scored, key=lambda s: s[0], default=(0, None, None))
-    if score < 2:
-        return {"answer": "That isn't in your documents.", "sources": []}
-    source = {k: d[k] for k in ("doc_id", "title", "version", "author", "approver")}
-    return {"answer": f"{line} (Source: {d['title']}, v{d['version']}, "
-                      f"author {d['author']}, approved by {d['approver']})",
-            "sources": [source]}
-
-
-if USE_FAKES:
-    db = SimpleNamespace(
-        get_user=_fake_get_user, get_docs_for_user=_fake_get_docs_for_user,
-        get_doc=_fake_get_doc, get_history=_fake_get_history,
-        get_proposals=_fake_get_proposals, get_pending=_fake_get_pending,
-        get_dependent_teams=_fake_get_dependent_teams, reset=_fake_reset)
-    governance = SimpleNamespace(propose=_fake_propose, approve=_fake_approve,
-                                 reject=_fake_reject)
-    rag = SimpleNamespace(ask=_fake_ask)
-else:
-    import db
-    import governance
-    import rag
-
-USERS = ["alice", "bob", "carol", "dave"]
+def _nice_date(value):
+    try:
+        return date.fromisoformat(str(value)[:10]).strftime("%b %-d, %Y")
+    except ValueError:
+        return value or "none"
 
 
 # ---------------------------------------------------------------------------
-# Teams state: channels and posts. UI-only, never stored in the database.
-# A post is {"id", "author", "text", "ts", "kind", "params", "replies"}; cards
-# are rebuilt from the database on every read, so they refresh in place the
-# way Teams Universal Action cards do.
+# Workspace state: who sees what, and the posts in each location. UI-only;
+# never stored in the database. A post is {"id", "author", "text", "ts", "kind",
+# "params", "replies"}. Cards are rebuilt from the database on every read, so
+# they refresh in place the way Teams Universal Action cards do.
 # ---------------------------------------------------------------------------
 
-CHANNELS = [
-    {"id": "dm", "team": None, "name": "Spot"},  # 1:1 chat with the bot, one per user
-    {"id": "ops", "team": "Ops Automation", "name": "Ops Automation"},
-    {"id": "pay", "team": "Payments", "name": "Payments"},
-]
-TEAM_CHANNEL = {c["team"]: c["id"] for c in CHANNELS if c["team"]}
 POSTS = {}
-SEEN = {}  # (user, channel) -> number of posts seen
+SEEN = {}                    # (user, location) -> message count seen
+SPOT_VIEW = {}               # user -> {"propose_doc", "propose_summary", "history_doc"}
 
 
-def _key(user, channel):
-    """Storage key for a chat: group chats are shared, the Spot chat is per user."""
-    key = f"dm-{user}" if channel == "dm" else channel
-    if key not in POSTS:
-        POSTS[key] = []
-        if channel == "dm":
-            _post(key, "Spot", f"Hi {user}! I'm **Spot**. Here you can talk to me without "
-                               "@mentioning me. Try **help**.")
-    return key
+def _channels_for(user):
+    allowed = workspace.CHANNEL_RESTRICTIONS.get(user)
+    teams = []
+    for t in workspace.TEAMS:
+        if user not in t["members"]:
+            continue
+        channels = [c for c in t["channels"] if not allowed or c["id"] in allowed]
+        if channels:
+            teams.append({**t, "channels": channels})
+    return teams
 
 
-def _post(channel, author, text="", kind=None, params=None, parent=None):
-    msg = {"id": uuid.uuid4().hex[:12], "author": author, "text": text, "ts": _now(),
-           "kind": kind, "params": params or {}, "replies": []}
-    (parent["replies"] if parent else POSTS[channel]).append(msg)
+def _chats_for(user):
+    return [c for c in workspace.CHATS if user in c["members"]]
+
+
+def _can_see(user, loc):
+    if loc == f"spot:{user}":
+        return True
+    kind, _, ident = loc.partition(":")
+    if kind == "channel":
+        return any(c["id"] == ident for t in _channels_for(user) for c in t["channels"])
+    if kind == "chat":
+        return any(c["id"] == ident for c in _chats_for(user))
+    return False
+
+
+def _posts(loc):
+    if loc not in POSTS:
+        POSTS[loc] = []
+        if loc.startswith("spot:"):
+            user = loc.split(":", 1)[1]
+            _post(loc, "spot", f"Hi {_name(user).split()[0]}! I'm **Spot**. I keep the program's "
+                               "requirements under version control. Try **help**.")
+    return POSTS[loc]
+
+
+def _post(loc, author, text="", kind=None, params=None, parent=None, ts=None, msg_id=None):
+    msg = {"id": msg_id or uuid.uuid4().hex[:12], "author": author, "text": text,
+           "ts": ts or _now(), "kind": kind, "params": params or {}, "replies": []}
+    (parent["replies"] if parent else _posts(loc)).append(msg)
     return msg
 
 
-def _find_post(channel, message_id):
-    for post in POSTS[channel]:
+def _find(loc, message_id):
+    for post in _posts(loc):
         for msg in [post] + post["replies"]:
             if msg["id"] == message_id:
                 return post, msg
     raise KeyError(message_id)
 
 
-def _announce(p, old_content, skip_channel=None):
-    """Post the approval request in the reviewing team's channel."""
-    channel = TEAM_CHANNEL.get(p["required_team"])
-    if channel and channel != skip_channel:
-        _post(channel, "Spot", f"**@{p['required_team']}** approval requested",
-              kind="proposal", params={"proposal_id": p["proposal_id"],
-                                       "doc_id": p["doc_id"], "old_content": old_content})
+def _proposal(proposal_id, doc_id=None):
+    docs = [doc_id] if doc_id else [p["doc_id"] for p in db.get_pending()]
+    for d in docs:
+        for p in db.get_proposals(d):
+            if p["proposal_id"] == proposal_id:
+                return p
+    return None
+
+
+def _proposal_params(p):
+    return {"proposal_id": p["proposal_id"], "doc_id": p["doc_id"],
+            "old_content": db.get_doc(p["doc_id"])["content"]}
 
 
 def reset_ui():
     POSTS.clear()
     SEEN.clear()
-    for c in CHANNELS[1:]:
-        POSTS[c["id"]] = []
-        _post(c["id"], "Spot", "Hi, I'm **Spot**. I keep this team's requirements under "
-                               "version control. Mention me with **@Spot help** to get started.")
-    for p in db.get_pending():
-        doc = db.get_doc(p["doc_id"])
-        _announce(p, doc["content"])
-        if TEAM_CHANNEL.get(doc["team"]) != TEAM_CHANNEL.get(p["required_team"]):
-            _post(TEAM_CHANNEL[doc["team"]], "Spot",
-                  f"**{p['proposed_by']}** proposed a change. Waiting on "
-                  f"**{p['required_team']}**.", kind="proposal",
-                  params={"proposal_id": p["proposal_id"], "doc_id": p["doc_id"],
-                          "old_content": doc["content"]})
+    SPOT_VIEW.clear()
+    by_id = {}
+    for m in sorted(workspace.MESSAGES, key=lambda m: m["timestamp"]):
+        kind, params = ("system", {}) if m["author"] == "system" else (None, {})
+        if m["proposal_id"]:
+            p = _proposal(m["proposal_id"])
+            if p:
+                kind, params = "proposal", _proposal_params(p)
+        parent = by_id.get(m["thread_parent_id"])
+        by_id[m["message_id"]] = _post(m["location"], m["author"], m["text"], kind=kind,
+                                       params=params, parent=parent, ts=m["timestamp"],
+                                       msg_id=m["message_id"])
+
+
+def _announce(p, skip_loc=None):
+    """Post the approval request in the reviewing team's home channel."""
+    loc = TEAM_HOME.get(p["required_team"])
+    if loc and loc != skip_loc:
+        _post(loc, "spot", f"**{p['required_team']}**, your approval is needed.",
+              kind="proposal", params=_proposal_params(p))
 
 
 # ---------------------------------------------------------------------------
@@ -280,73 +167,82 @@ def _text(text, **kw):
     return {"type": "TextBlock", "text": text, "wrap": True, **kw}
 
 
-def _eyebrow(label):
-    return _text(f"SPOT · {label}", size="Small", weight="Bolder", isSubtle=True,
-                 spacing="None")
-
-
 def _routing(p, doc):
     if p["required_team"] != doc["team"]:
         return f"{p['required_team']} (depends on {doc['team']})"
     return f"{p['required_team']} (no other team depends on it)"
 
 
-def _content_column(label, content, other, color):
-    other_lines = set(other.splitlines())
-    lines = [_text(line, fontType="Monospace", size="Small", spacing="None",
-                   **({"color": color, "weight": "Bolder"} if line not in other_lines else {}))
-             for line in content.splitlines() if line.strip()]
-    return {"type": "Column", "width": "stretch", "items": [
-        _text(label, size="Small", weight="Bolder", isSubtle=True),
-        {"type": "Container", "style": "emphasis", "bleed": False, "items": lines},
-    ]}
+def _diff_inlines(old, new, context=8):
+    """Word-level diff as RichTextBlock runs: removed words struck through, added words bold."""
+    a, b = old.split(), new.split()
+    runs = []
+    ops = difflib.SequenceMatcher(None, a, b).get_opcodes()
+    for i, (tag, a1, a2, b1, b2) in enumerate(ops):
+        if tag == "equal":
+            words = a[a1:a2]
+            if len(words) > context * 2:
+                head = words[:context] if i else []
+                tail = words[-context:] if i < len(ops) - 1 else []
+                words = head + ["…"] + tail
+            runs.append({"type": "TextRun", "text": " ".join(words) + " "})
+            continue
+        if a2 > a1:
+            runs.append({"type": "TextRun", "text": " ".join(a[a1:a2]), "strikethrough": True,
+                         "color": "Attention"})
+            runs.append({"type": "TextRun", "text": " "})
+        if b2 > b1:
+            runs.append({"type": "TextRun", "text": " ".join(b[b1:b2]), "weight": "Bolder",
+                         "color": "Good"})
+            runs.append({"type": "TextRun", "text": " "})
+    return runs
 
 
 def proposal_card(params):
-    p = next((x for x in db.get_proposals(params["doc_id"])
-              if x["proposal_id"] == params["proposal_id"]), None)
+    p = _proposal(params["proposal_id"], params["doc_id"])
     doc = db.get_doc(params["doc_id"])
     if not p or not doc:
         return _card([_text("This proposal no longer exists.", isSubtle=True)])
-    old = params.get("old_content", doc["content"])
     status = p["status"]
-    title = {"pending": f"Approval requested from {p['required_team']}",
-             "approved": f"Approved by {p['approved_by']}",
-             "rejected": "Rejected"}[status]
+    status_line = {
+        "pending": _text(f"● Pending approval from {p['required_team']}", size="Small",
+                         weight="Bolder", color="Accent"),
+        "approved": _text(f"✓ Approved by {_name(p['approved_by'])}", size="Small",
+                          weight="Bolder", color="Good"),
+        "rejected": _text("✕ Rejected", size="Small", weight="Bolder", color="Attention"),
+    }[status]
     body = [
-        _eyebrow("CHANGE REQUEST"),
-        _text(title, size="Large", weight="Bolder", spacing="Small",
-              **({"color": "Good"} if status == "approved" else
-                 {"color": "Attention"} if status == "rejected" else {})),
-        _text(p["summary"], spacing="Small"),
-        {"type": "FactSet", "facts": [
-            {"title": "Document", "value": doc["title"]},
-            {"title": "Proposed by", "value": p["proposed_by"]},
-            {"title": "Deadline", "value": p["deadline"] or "none"},
+        status_line,
+        _text(p["summary"], size="Large", weight="Bolder", spacing="Small"),
+        _text(f"{doc['title']} · proposed by {_name(p['proposed_by'])}", isSubtle=True,
+              size="Small", spacing="None"),
+        {"type": "FactSet", "spacing": "Medium", "facts": [
+            {"title": "Deadline", "value": _nice_date(p["deadline"])},
             {"title": "Routed to", "value": _routing(p, doc)},
         ]},
-        {"type": "ColumnSet", "spacing": "Medium", "columns": [
-            _content_column("CURRENT · APPROVED" if status == "pending" else "BEFORE",
-                            old, p["new_content"], "Attention"),
-            _content_column("PROPOSED" if status == "pending" else "AFTER",
-                            p["new_content"], old, "Good"),
-        ]},
+        _text("Changes", weight="Bolder", size="Small", isSubtle=True, separator=True,
+              spacing="Medium"),
+        {"type": "RichTextBlock", "spacing": "Small",
+         "inlines": _diff_inlines(params.get("old_content", doc["content"]), p["new_content"])},
     ]
+    full_text = {"type": "Action.ShowCard", "title": "View full text", "card": _card([
+        _text("Proposed text", weight="Bolder", size="Small", isSubtle=True),
+        _text(p["new_content"])])}
     if status == "approved":
-        body.append(_text(f"✅ Binding now. {doc['title']} is v{doc['version']}, "
-                          f"changed by {p['proposed_by']}, approved by {p['approved_by']}.",
-                          color="Good", size="Small", spacing="Medium"))
-        return _card(body)
+        body.append(_text(f"Binding. {doc['title']} is v{doc['version']}, approved by "
+                          f"{_name(p['approved_by'])} and recorded in History.",
+                          size="Small", color="Good", spacing="Medium"))
+        return _card(body, [full_text])
     if status == "rejected":
-        body.append(_text("Not approved: not binding.", color="Attention", size="Small",
+        body.append(_text("Not approved: not binding.", size="Small", color="Attention",
                           spacing="Medium"))
-        return _card(body)
+        return _card(body, [full_text])
     data = {"proposal_id": p["proposal_id"], "doc_id": p["doc_id"]}
     return _card(body, [
         {"type": "Action.Submit", "title": "Approve", "style": "positive",
          "data": {"action": "approve", **data}},
-        {"type": "Action.Submit", "title": "Reject", "style": "destructive",
-         "data": {"action": "reject", **data}},
+        {"type": "Action.Submit", "title": "Reject", "data": {"action": "reject", **data}},
+        full_text,
     ])
 
 
@@ -356,16 +252,17 @@ def propose_form_card(params):
     route = (f"{dependents[0]}, because {dependents[0]} depends on {doc['team']}"
              if dependents else f"{doc['team']}, because no other team depends on it")
     return _card([
-        _eyebrow("PROPOSE A CHANGE"),
+        _text("New proposal", size="Small", weight="Bolder", color="Accent"),
         _text(doc["title"], size="Large", weight="Bolder", spacing="Small"),
-        _text(f"Current: v{doc['version']}, approved by {doc['approver']}",
+        _text(f"Current: v{doc['version']}, approved by {_name(doc['approver'])}",
               isSubtle=True, size="Small", spacing="None"),
-        {"type": "Input.Text", "id": "new_content", "label": "New content",
-         "isMultiline": True, "value": doc["content"], "isRequired": True,
-         "errorMessage": "Enter the new content"},
         {"type": "Input.Text", "id": "summary", "label": "What changed and why",
-         "placeholder": "e.g. Cutover moved two weeks per Infra meeting 10/9",
-         "isRequired": True, "errorMessage": "Add a short summary"},
+         "value": params.get("summary", ""), "isRequired": True,
+         "placeholder": "e.g. Cutover moved two weeks per cutover sync on Oct 9",
+         "errorMessage": "Add a short summary"},
+        {"type": "Input.Text", "id": "new_content", "label": "Updated requirement text",
+         "isMultiline": True, "value": doc["content"], "isRequired": True,
+         "errorMessage": "Enter the new text"},
         {"type": "Input.Date", "id": "deadline", "label": "Approval needed by",
          "value": (date.today() + timedelta(days=7)).isoformat(), "isRequired": True},
         _text(f"Spot will route this to {route}.", isSubtle=True, size="Small"),
@@ -375,56 +272,64 @@ def propose_form_card(params):
 
 def doc_picker_card(params):
     return _card([
-        _eyebrow(params["label"].upper()),
         _text(params["prompt"], weight="Bolder"),
         {"type": "Input.ChoiceSet", "id": "doc_id", "style": "compact", "isRequired": True,
          "value": params["docs"][0]["doc_id"],
          "choices": [{"title": d["title"], "value": d["doc_id"]} for d in params["docs"]]},
     ], [{"type": "Action.Submit", "title": "Continue",
-         "data": {"action": params["next"]}}])
+         "data": {"action": params["next"], "summary": params.get("summary", "")}}])
 
 
 def history_card(params):
     doc = db.get_doc(params["doc_id"])
     body = [
-        _eyebrow("HISTORY"),
+        _text("History", size="Small", weight="Bolder", color="Accent"),
         _text(doc["title"], size="Large", weight="Bolder", spacing="Small"),
-        _text(f"{doc['team']} · current v{doc['version']}, approved by {doc['approver']}",
+        _text(f"{doc['team']} · current v{doc['version']}, approved by {_name(doc['approver'])}",
               isSubtle=True, size="Small", spacing="None"),
     ]
     for i, h in enumerate(db.get_history(doc["doc_id"])):
-        meta = (f"changed by {h['changed_by']} · approved by {h['approved_by']} · "
-                f"{(h['changed_at'] or '')[:10]}")
+        meta = (f"Changed by {_name(h['changed_by'])} · approved by {_name(h['approved_by'])} · "
+                f"{_nice_date(h['changed_at'])}")
         if h["deadline"]:
-            meta += f" · deadline {h['deadline']}"
+            meta += f" · deadline {_nice_date(h['deadline'])}"
         body.append({"type": "ColumnSet", "separator": True, "spacing": "Medium", "columns": [
-            {"type": "Column", "width": "40px", "items": [
+            {"type": "Column", "width": "44px", "items": [
                 _text(f"v{h['version']}", weight="Bolder", size="Medium",
-                      **({"color": "Good"} if i == 0 else {}))]},
+                      color="Good" if i == 0 else "Default")]},
             {"type": "Column", "width": "stretch", "items": [
-                _text(h["summary"] + ("  ·  **CURRENT**" if i == 0 else "")),
+                _text(h["summary"] + ("  ·  Current" if i == 0 else ""), weight="Bolder"),
                 _text(meta, isSubtle=True, size="Small", spacing="None")]},
         ]})
+    if not db.get_history(doc["doc_id"]):
+        body.append(_text(f"v{doc['version']} is the original approved version "
+                          f"(author {_name(doc['author'])}, approved by {_name(doc['approver'])}).",
+                          isSubtle=True, separator=True, spacing="Medium"))
     not_binding = [p for p in db.get_proposals(doc["doc_id"]) if p["status"] != "approved"]
     if not_binding:
-        body.append(_text("NOT APPROVED: NOT BINDING", weight="Bolder", size="Small",
-                          color="Attention", separator=True, spacing="Large"))
+        body.append(_text("Not approved: not binding", weight="Bolder", color="Attention",
+                          separator=True, spacing="Large"))
         for p in not_binding:
-            body.append(_text(f"**{p['status'].capitalize()}:** {p['summary']}", spacing="Small"))
-            body.append(_text(f"proposed by {p['proposed_by']} · needs {p['required_team']} · "
-                              f"deadline {p['deadline']} · Not approved: not binding.",
+            body.append(_text(f"{p['status'].capitalize()}: {p['summary']}", spacing="Small"))
+            body.append(_text(f"Proposed by {_name(p['proposed_by'])} · needs {p['required_team']} · "
+                              f"deadline {_nice_date(p['deadline'])}. Not approved: not binding.",
                               isSubtle=True, size="Small", spacing="None"))
     return _card(body)
 
 
 def answer_card(params):
-    body = [_eyebrow("ANSWER"), _text(params["answer"], spacing="Small")]
+    body = [_text(params["answer"])]
     if params["sources"]:
-        body.append(_text("SOURCES", size="Small", weight="Bolder", isSubtle=True,
+        body.append(_text("Sources", size="Small", weight="Bolder", isSubtle=True,
                           separator=True, spacing="Medium"))
-        for s in params["sources"]:
-            body.append(_text(f"📄 **{s['title']}** · v{s['version']} · by {s['author']} · "
-                              f"approved by {s['approver']}", size="Small", spacing="Small"))
+        for i, s in enumerate(params["sources"][:4], 1):
+            body.append({"type": "RichTextBlock", "spacing": "Small", "inlines": [
+                {"type": "TextRun", "text": f"[{i}] ", "color": "Accent", "weight": "Bolder"},
+                {"type": "TextRun", "text": s["title"], "weight": "Bolder"},
+                {"type": "TextRun", "text": f"  v{s['version']} · by {_name(s['author'])} · "
+                                            f"approved by {_name(s['approver'])}",
+                 "isSubtle": True, "size": "Small"},
+            ]})
     body.append(_text("Answered from approved documents only. Pending proposals are never used.",
                       isSubtle=True, size="Small", spacing="Medium"))
     return _card(body)
@@ -432,15 +337,15 @@ def answer_card(params):
 
 def help_card(params):
     return _card([
-        _eyebrow("HELP"),
-        _text("Here's what I can do", size="Large", weight="Bolder", spacing="Small"),
+        _text("What Spot can do", size="Large", weight="Bolder"),
         {"type": "FactSet", "facts": [
+            {"title": "@Spot add", "value": "Reply to a message to turn its decision into a proposal"},
             {"title": "@Spot propose <doc>", "value": "Propose a change to one of your team's docs"},
             {"title": "@Spot ask <question>", "value": "Ask about approved docs, with citations"},
-            {"title": "@Spot history <doc>", "value": "See approved versions and what isn't binding"},
-            {"title": "@Spot pending", "value": "List changes waiting for approval"},
+            {"title": "@Spot history <doc>", "value": "Approved versions, and what isn't binding"},
+            {"title": "@Spot pending", "value": "Changes waiting for approval"},
         ]},
-        _text("Changes only become binding when an Approver on the dependent team approves them.",
+        _text("A change only becomes binding when an Approver on the dependent team approves it.",
               isSubtle=True, size="Small"),
     ])
 
@@ -462,92 +367,109 @@ def _match_doc(docs, query):
     return doc if score else None
 
 
-def _picker(user, docs, label, prompt, next_action):
+def _picker(docs, prompt, next_action, summary=""):
     return {"kind": "doc_picker", "params": {
-        "label": label, "prompt": prompt, "next": next_action,
+        "prompt": prompt, "next": next_action, "summary": summary,
         "docs": [{"doc_id": d["doc_id"], "title": d["title"]} for d in docs]}}
 
 
-def handle_command(user, channel, text, post):
+def _start_proposal(user, loc, post, context, summary):
+    me = db.get_user(user)
+    if me["role"] not in ("Contributor", "Approver"):
+        _post(loc, "spot", f"{_name(user)}, you're a **{me['role']}** on {me['team']}, so you can't "
+                           "propose changes. Ask a Contributor or Approver.", parent=post)
+        return
+    own = [d for d in db.get_docs_for_user(user) if d["team"] == me["team"]]
+    doc = _match_doc(own, context)
+    if doc:
+        _post(loc, "spot", kind="propose_form", parent=post,
+              params={"doc_id": doc["doc_id"], "summary": summary})
+    else:
+        _post(loc, "spot", parent=post, **_picker(own, "Which doc does this change?",
+                                                   "pick_propose", summary))
+
+
+def handle_command(user, loc, text, post, parent_text=""):
     command = re.sub(r"@spot\b", "", text, flags=re.I).strip()
     word, _, rest = command.partition(" ")
     word = word.lower()
-    me = db.get_user(user)
-
     if word in ("", "help"):
-        _post(channel, "Spot", kind="help", parent=post)
+        _post(loc, "spot", kind="help", parent=post)
+    elif word == "add":
+        summary = rest or parent_text.split(". ")[0][:120]
+        _start_proposal(user, loc, post, f"{rest} {parent_text}", summary)
     elif word == "propose":
-        if me["role"] not in ("Contributor", "Approver"):
-            _post(channel, "Spot", f"{user}, you're a **{me['role']}** on {me['team']}, so you "
-                                   "can't propose changes. Ask a Contributor or Approver.",
-                  parent=post)
-            return
-        own = [d for d in db.get_docs_for_user(user) if d["team"] == me["team"]]
-        doc = _match_doc(own, rest)
-        if doc:
-            _post(channel, "Spot", kind="propose_form", params={"doc_id": doc["doc_id"]},
-                  parent=post)
-        else:
-            _post(channel, "Spot", parent=post, **_picker(
-                user, own, "Propose a change", "Which doc do you want to change?",
-                "pick_propose"))
+        _start_proposal(user, loc, post, rest, "")
     elif word == "history":
         docs = db.get_docs_for_user(user)
         doc = _match_doc(docs, rest)
         if doc:
-            _post(channel, "Spot", kind="history", params={"doc_id": doc["doc_id"]}, parent=post)
+            _post(loc, "spot", kind="history", params={"doc_id": doc["doc_id"]}, parent=post)
         else:
-            _post(channel, "Spot", parent=post, **_picker(
-                user, docs, "History", "Which doc's history?", "pick_history"))
+            _post(loc, "spot", parent=post, **_picker(docs, "Which doc's history?", "pick_history"))
     elif word == "pending":
         pending = db.get_pending()
         if not pending:
-            _post(channel, "Spot", "Nothing is waiting for approval.", parent=post)
+            _post(loc, "spot", "Nothing is waiting for approval.", parent=post)
         for p in pending:
-            _post(channel, "Spot", kind="proposal", parent=post,
-                  params={"proposal_id": p["proposal_id"], "doc_id": p["doc_id"],
-                          "old_content": db.get_doc(p["doc_id"])["content"]})
+            _post(loc, "spot", kind="proposal", params=_proposal_params(p), parent=post)
     else:
         question = rest if word == "ask" else command
         try:
             result = rag.ask(user, question)
         except Exception as e:  # keep the demo alive if the LLM call fails
-            _post(channel, "Spot", f"Sorry, I couldn't reach the language model ({e}).",
-                  parent=post)
+            _post(loc, "spot", f"Sorry, I couldn't reach the language model ({e}).", parent=post)
             return
-        _post(channel, "Spot", kind="answer", params=result, parent=post)
+        _post(loc, "spot", kind="answer", params=result, parent=post)
 
 
-def handle_action(user, channel, message_id, data):
+def _submit_proposal(user, data):
+    doc = db.get_doc(data["doc_id"])
+    if data.get("new_content", "").strip() == doc["content"].strip():
+        raise ValueError("Nothing changed. Edit the requirement text before submitting.")
+    pid = governance.propose(user, doc["doc_id"], data["new_content"], data["summary"],
+                             data["deadline"])
+    return _proposal(pid, doc["doc_id"]), doc
+
+
+def handle_action(user, loc, message_id, data):
     """Runs a card button. Returns an error string, or None on success."""
-    post, msg = _find_post(channel, message_id)
     action = data.get("action")
+    if loc == "spot-app":  # cards in the Spot app's Pending and History views
+        view = SPOT_VIEW.setdefault(user, {})
+        if action == "pick_propose":
+            view.update(propose_doc=data["doc_id"], propose_summary=data.get("summary", ""))
+        elif action == "pick_history":
+            view["history_doc"] = data["doc_id"]
+        elif action == "submit_proposal":
+            p, doc = _submit_proposal(user, data)
+            view.pop("propose_doc", None)
+            _announce(p)
+        elif action == "approve":
+            governance.approve(user, data["proposal_id"])
+        elif action == "reject":
+            governance.reject(user, data["proposal_id"])
+        return None
+
+    post, msg = _find(loc, message_id)
     if action == "pick_propose":
-        msg.update(kind="propose_form", params={"doc_id": data["doc_id"]})
+        msg.update(kind="propose_form", params={"doc_id": data["doc_id"],
+                                                "summary": data.get("summary", "")})
     elif action == "pick_history":
         msg.update(kind="history", params={"doc_id": data["doc_id"]})
     elif action == "submit_proposal":
-        doc = db.get_doc(data["doc_id"])
-        if data.get("new_content", "").strip() == doc["content"].strip():
-            return "Nothing changed. Edit the content before submitting."
-        pid = governance.propose(user, doc["doc_id"], data["new_content"],
-                                 data["summary"], data["deadline"])
-        p = next(x for x in db.get_pending() if x["proposal_id"] == pid)
-        msg.update(kind="proposal", params={"proposal_id": pid, "doc_id": doc["doc_id"],
-                                            "old_content": doc["content"]})
-        target = TEAM_CHANNEL.get(p["required_team"])
-        where = (f" I've asked them in the **{p['required_team']}** chat."
-                 if target and target != channel else "")
-        _post(channel, "Spot", f"Routed to **{_routing(p, doc)}**.{where}", parent=post)
-        _announce(p, doc["content"], skip_channel=channel)
+        p, doc = _submit_proposal(user, data)
+        msg.update(kind="proposal", params=_proposal_params(p) | {"old_content": doc["content"]},
+                   text=f"Proposal created: {p['summary']}. Routed to {_routing(p, doc)}.")
+        _announce(p, skip_loc=loc)
     elif action == "approve":
         version = governance.approve(user, data["proposal_id"])
         doc = db.get_doc(data["doc_id"])
-        _post(channel, "Spot", f"**{user}** approved. **{doc['title']}** is now "
-                               f"**v{version}** and recorded in History.", parent=post)
+        _post(loc, "spot", f"**{_name(user)}** approved. **{doc['title']}** is now **v{version}** "
+                           "and recorded in History.", parent=post)
     elif action == "reject":
         governance.reject(user, data["proposal_id"])
-        _post(channel, "Spot", f"**{user}** rejected this change. It is not binding.",
+        _post(loc, "spot", f"**{_name(user)}** rejected this change. It is not binding.",
               parent=post)
     return None
 
@@ -560,38 +482,80 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 
 def _render(msg):
-    out = {k: msg[k] for k in ("id", "author", "text", "ts")}
-    out["card"] = CARDS[msg["kind"]](msg["params"]) if msg["kind"] else None
+    out = {k: msg[k] for k in ("id", "author", "text", "ts", "kind")}
+    out["card"] = CARDS[msg["kind"]](msg["params"]) if msg["kind"] in CARDS else None
     return out
 
 
-def _channel_view(user, channel):
-    key = _key(user, channel)
-    SEEN[(user, key)] = len(POSTS[key])
-    return [dict(_render(p), replies=[_render(r) for r in p["replies"]])
-            for p in POSTS[key]]
+def _view(user, loc):
+    SEEN[(user, loc)] = len(_posts(loc))
+    return [dict(_render(p), replies=[_render(r) for r in p["replies"]]) for p in _posts(loc)]
+
+
+def _activity(user):
+    me = db.get_user(user)
+    items = []
+    for p in db.get_pending():
+        if p["required_team"] != me["team"]:
+            continue
+        loc = next((l for l, posts in POSTS.items() if _can_see(user, l) and any(
+            m.get("params", {}).get("proposal_id") == p["proposal_id"]
+            for post in posts for m in [post] + post["replies"])), TEAM_HOME.get(me["team"]))
+        doc = db.get_doc(p["doc_id"])
+        items.append({"location": loc, "summary": p["summary"], "doc": doc["title"],
+                      "proposed_by": _name(p["proposed_by"]), "ts": p["created_at"]})
+    return sorted(items, key=lambda a: a["ts"], reverse=True)
 
 
 def _state(user):
-    me = db.get_user(user)
-    pending = [p for p in db.get_pending() if p["required_team"] == me["team"]]
-    activity = []
-    for p in pending:
-        doc = db.get_doc(p["doc_id"])
-        activity.append({"channel": TEAM_CHANNEL.get(me["team"]), "summary": p["summary"],
-                         "doc": doc["title"], "proposed_by": p["proposed_by"],
-                         "ts": p["created_at"]})
-    channels = []
-    for c in CHANNELS:
-        key = _key(user, c["id"])
-        last = POSTS[key][-1] if POSTS[key] else None
+    people = {u: _user(u) for u in workspace.ALL_USERS + ["spot"]}
+    teams = [{"id": t["id"], "name": t["name"], "avatar_color": t["avatar_color"],
+              "channels": [dict(c, location=f"channel:{c['id']}",
+                                unread=bool(SEEN.get((user, f"channel:{c['id']}"), 0)
+                                            < len(_posts(f"channel:{c['id']}"))))
+                           for c in t["channels"]]}
+             for t in _channels_for(user)]
+    chats = [{"location": f"spot:{user}", "name": "Spot", "kind": "bot", "members": ["spot"]}]
+    for c in _chats_for(user):
+        others = [m for m in c["members"] if m != user]
+        chats.append({"location": f"chat:{c['id']}", "kind": c["kind"], "members": c["members"],
+                      "name": c["name"] or ", ".join(_name(m) for m in others)})
+    for c in chats:
+        posts = _posts(c["location"])
+        last = posts[-1] if posts else None
         if last and last["replies"]:
             last = last["replies"][-1]
-        channels.append(dict(c, unread=max(0, len(POSTS[key]) - SEEN.get((user, key), 0)),
-                             preview=last and {"author": last["author"], "ts": last["ts"],
-                                               "text": last["text"] or "Sent a card"}))
-    return {"me": me, "users": [db.get_user(u) for u in USERS],
-            "channels": channels, "activity": activity}
+        c["unread"] = SEEN.get((user, c["location"]), 0) < len(posts)
+        c["preview"] = last and {"author": last["author"], "ts": last["ts"],
+                                 "text": last["text"] or "Sent a card"}
+    return {"me": _user(user), "org": workspace.ORG_NAME, "people": people,
+            "switcher": CORE_USERS + [u for u in workspace.ALL_USERS if u not in CORE_USERS],
+            "teams": teams, "chats": chats, "activity": _activity(user)}
+
+
+def _spot_items(user, tab):
+    view = SPOT_VIEW.setdefault(user, {})
+    if tab == "pending":
+        me = db.get_user(user)
+        items = []
+        if me["role"] in ("Contributor", "Approver"):
+            if view.get("propose_doc"):
+                items.append({"id": "propose", "card": propose_form_card(
+                    {"doc_id": view["propose_doc"], "summary": view.get("propose_summary", "")})})
+            else:
+                own = [d for d in db.get_docs_for_user(user) if d["team"] == me["team"]]
+                items.append({"id": "propose", "card": doc_picker_card(_picker(
+                    own, "Propose a change to one of your team's docs", "pick_propose")["params"])})
+        items += [{"id": p["proposal_id"], "card": proposal_card(_proposal_params(p))}
+                  for p in db.get_pending()]
+        return items
+    docs = db.get_docs_for_user(user)
+    ids = [d["doc_id"] for d in docs]
+    doc_id = view.get("history_doc") or ("ops-uae-identity" if "ops-uae-identity" in ids else ids[0])
+    picker = _picker(docs, "Pick a document", "pick_history")["params"]
+    picker["docs"].sort(key=lambda d: d["doc_id"] != doc_id)
+    return [{"id": "history-picker", "card": doc_picker_card(picker)},
+            {"id": "history", "card": history_card({"doc_id": doc_id})}]
 
 
 @app.get("/")
@@ -604,31 +568,43 @@ def api_state():
     return jsonify(_state(request.args["user"]))
 
 
-@app.get("/api/channel/<channel>")
-def api_channel(channel):
-    return jsonify({"posts": _channel_view(request.args["user"], channel)})
+@app.get("/api/location")
+def api_location():
+    user, loc = request.args["user"], request.args["loc"]
+    if not _can_see(user, loc):
+        return jsonify({"posts": [], "error": "You're not a member of this conversation."})
+    return jsonify({"posts": _view(user, loc)})
+
+
+@app.get("/api/spot/<tab>")
+def api_spot(tab):
+    return jsonify({"items": _spot_items(request.args["user"], tab)})
 
 
 @app.post("/api/post")
 def api_post():
     body = request.get_json()
-    user, channel, text = body["user"], body["channel"], body["text"].strip()
-    key = _key(user, channel)
-    post = _post(key, user, text)
-    if channel == "dm" or re.search(r"@spot\b", text, flags=re.I):
-        handle_command(user, key, text, post)
-    return jsonify({"posts": _channel_view(user, channel)})
+    user, loc, text = body["user"], body["loc"], body["text"].strip()
+    parent = None
+    if body.get("parent_id"):
+        parent, _ = _find(loc, body["parent_id"])
+    post = _post(loc, user, text, parent=parent)
+    if loc.startswith("spot:") or re.search(r"@spot\b", text, flags=re.I):
+        handle_command(user, loc, text, parent or post,
+                       parent_text=parent["text"] if parent else "")
+    return jsonify({"posts": _view(user, loc)})
 
 
 @app.post("/api/action")
 def api_action():
     body = request.get_json()
-    user, channel = body["user"], body["channel"]
+    user, loc = body["user"], body["loc"]
     try:
-        error = handle_action(user, _key(user, channel), body["message_id"], body["data"])
-    except PermissionError as e:
+        error = handle_action(user, loc, body["message_id"], body["data"])
+    except (PermissionError, ValueError) as e:
         error = str(e)
-    return jsonify({"posts": _channel_view(user, channel), "error": error})
+    posts = [] if loc == "spot-app" else _view(user, loc)
+    return jsonify({"posts": posts, "error": error})
 
 
 @app.post("/api/reset")
@@ -639,10 +615,7 @@ def api_reset():
 
 
 def main():
-    try:
-        db.get_pending()
-    except Exception:  # first run against the real db: create and seed it
-        db.reset()
+    db.reset()  # every start is a clean demo
     reset_ui()
     app.run(host="127.0.0.1", port=8501, debug=False)
 
