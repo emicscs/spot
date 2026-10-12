@@ -7,11 +7,13 @@ and it replies with Adaptive Cards built here. All data goes through the
 contract functions in db, governance and rag. See CONTRACTS.md.
 """
 import difflib
+import json
+import os
 import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request
 
 import db
 import governance
@@ -571,9 +573,22 @@ def _spot_items(user, tab):
             {"id": "history", "card": history_card({"doc_id": doc_id})}]
 
 
+def _default_user():
+    """Who the app opens 'signed in' as. Set DEMO_DEFAULT_USER in .env to any
+    seeded user key (e.g. daniel.okafor) to start the demo already on that
+    role's view. Falls back to marcus.chen if unset or not a real user - this
+    only changes the pre-selected name in the switcher, nothing about what
+    that user is allowed to do."""
+    wanted = os.getenv("DEMO_DEFAULT_USER", "").strip()
+    return wanted if wanted in db.USERS else "marcus.chen"
+
+
 @app.get("/")
 def index():
-    return send_from_directory("static", "index.html")
+    with open(os.path.join(app.static_folder, "index.html")) as f:
+        html = f.read()
+    snippet = f"<script>window.DEMO_DEFAULT_USER={json.dumps(_default_user())};</script>"
+    return html.replace("<!--DEMO_DEFAULT_USER-->", snippet, 1)
 
 
 @app.get("/api/state")
