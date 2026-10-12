@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chat | Spot | Microsoft Teams</title>
+  <link rel="icon" href="/static/icons/location_24_filled.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/teams.css">
+</head>
+<body>
+  <nav class="rail" aria-label="Apps">
+    <button class="rail-item" data-view="activity" title="Activity">
+      <span class="ic" style="--i:url(/static/icons/alert_24_regular.svg)"></span>
+      <b class="badge hidden" id="activity-badge"></b>
+    </button>
+    <button class="rail-item on" data-view="chat" title="Chat">
+      <span class="ic" style="--i:url(/static/icons/chat_24_filled.svg)"></span>
+    </button>
+    <button class="rail-item" data-view="meet" title="Meet">
+      <span class="ic" style="--i:url(/static/icons/video_24_regular.svg)"></span>
+    </button>
+    <button class="rail-item" data-view="people" title="People">
+      <span class="ic" style="--i:url(/static/icons/contact_card_24_regular.svg)"></span>
+    </button>
+    <button class="rail-item" data-view="teams" title="Teams">
+      <span class="ic" style="--i:url(/static/icons/people_team_24_regular.svg)"></span>
+    </button>
+    <button class="rail-item" data-view="calendar" title="Calendar">
+      <span class="ic" style="--i:url(/static/icons/calendar_ltr_24_regular.svg)"></span>
+    </button>
+    <button class="rail-item app" data-view="spot" title="Spot">
+      <span class="ic" style="--i:url(/static/icons/location_24_filled.svg)"></span>
+    </button>
+    <div class="rail-spacer"></div>
+    <button class="rail-item" data-view="apps" title="Apps">
+      <span class="ic" style="--i:url(/static/icons/apps_24_regular.svg)"></span>
+    </button>
+  </nav>
+
+  <div class="main">
+    <header class="titlebar">
+      <button class="tb-icon" aria-label="Toggle list"><span class="ic" style="--i:url(/static/icons/panel_left_20_regular.svg)"></span></button>
+      <label class="tb-search">
+        <span class="ic" style="--i:url(/static/icons/search_20_regular.svg)"></span>
+        <input placeholder="Press Ctrl+Alt+G to go right to a chat or channel" aria-label="Search">
+      </label>
+      <div class="tb-right">
+        <button class="tb-icon" aria-label="Settings and more"><span class="ic" style="--i:url(/static/icons/more_horizontal_20_regular.svg)"></span></button>
+        <button class="me" id="me-btn" aria-haspopup="menu" aria-label="Account"></button>
+      </div>
+      <div class="menu hidden" id="me-menu" role="menu"></div>
+    </header>
+
+    <div class="body">
+      <aside class="list" id="list"></aside>
+
+      <section class="panel">
+        <div class="chat-head">
+          <div id="chat-avatar"></div>
+          <div class="chat-name" id="chat-name"></div>
+          <div class="chat-meta" id="chat-meta"></div>
+          <button class="tb-icon head-search" aria-label="Search in chat"><span class="ic" style="--i:url(/static/icons/search_20_regular.svg)"></span></button>
+        </div>
+
+        <div class="feed" id="feed"></div>
+
+        <div class="composer">
+          <div class="popup hidden" id="popup" role="listbox"></div>
+          <div class="suggest" id="suggest"></div>
+          <div class="compose-box">
+            <textarea id="compose" rows="1" placeholder="Type a message"></textarea>
+            <div class="compose-icons">
+              <span class="ic" style="--i:url(/static/icons/emoji_20_regular.svg)"></span>
+              <span class="ic" style="--i:url(/static/icons/attach_20_regular.svg)"></span>
+              <span class="ic" style="--i:url(/static/icons/image_20_regular.svg)"></span>
+              <span class="ic" style="--i:url(/static/icons/add_20_regular.svg)"></span>
+              <span class="divider"></span>
+              <button class="send" id="send" aria-label="Send"><span class="ic" style="--i:url(/static/icons/send_20_regular.svg)"></span></button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="/static/vendor/adaptivecards.min.js"></script>
+  <script src="/static/spot.js"></script>
+</body>
+</html>
