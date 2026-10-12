@@ -58,7 +58,7 @@ if __name__ == "__main__":
     demo = "What is the cutover date for the UAE identity service?"
     off_topic = "What is the capital of France?"
     for question in (demo, off_topic):
-        result = ask("alice", question)
+        result = ask("priya.raman", question)
         print("Q:", question)
         print(result["answer"])
         print("sources:", result["sources"])
