@@ -21,7 +21,9 @@ cp .env.example .env   # then fill in LLM_API_KEY and LLM_MODEL
 python app.py
 ```
 
-Open http://localhost:8501. The UI looks like Microsoft Teams: chat with **Spot** directly, or mention **@Spot** in the Ops Automation and Payments group chats. Switch demo users from the avatar menu (top right), which also has **Reset demo**.
+Open http://localhost:8501. The UI is a Microsoft Teams lookalike for a fictional Mastercard workspace (all people and conversations are fictional; see `workspace.py`). Mention **@Spot** in any channel or chat, or open **Spot** in the left rail for Pending, History and Chat. Switch demo users with **Signed in as** in the top bar; **Reset demo** restores the seed data.
+
+Demo users: Marcus Chen (Ops Automation, Contributor), Priya Raman (Ops Automation, Approver), Daniel Okafor (Payments, Approver), Elena Rossi (Payments, Reader). Walkthrough: [demo_script.md](demo_script.md).
 
 ## Contract
 
@@ -33,6 +35,6 @@ Read [CONTRACTS.md](CONTRACTS.md) before writing any code. It is frozen: nobody 
 | seed.py | Derrick |
 | governance.py | Evan |
 | rag.py | Emilio |
-| app.py | Frankie |
+| app.py, static/, workspace.py | Frankie |
 | demo_script.md, SOW, integration | Aarnav |
 | config.py | shared, do not edit |
