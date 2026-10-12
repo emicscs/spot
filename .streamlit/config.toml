@@ -1,0 +1,11 @@
+# Microsoft Teams colors (Frankie owns this file)
+[theme]
+base = "light"
+primaryColor = "#5B5FC7"
+backgroundColor = "#F5F5F5"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#242424"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"
