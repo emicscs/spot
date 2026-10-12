@@ -1,4 +1,4 @@
-"""Seed data for Spot. Owner: Person 2. See CONTRACTS.md."""
+"""Seed data for Spot. Owner: Contributor 3. See CONTRACTS.md."""
 import db
 
 

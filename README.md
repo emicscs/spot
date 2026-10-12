@@ -27,10 +27,10 @@ Read [CONTRACTS.md](CONTRACTS.md) before writing any code. It is frozen: nobody 
 
 | File | Owner |
 |---|---|
-| db.py | Person 1 |
-| seed.py | Person 2 |
-| governance.py | Person 3 |
-| rag.py | Person 4 |
-| app.py | Person 5 |
-| demo_script.md, SOW, integration | Person 6 |
+| db.py | Contributor 2 |
+| seed.py | Contributor 3 |
+| governance.py | Contributor 4 |
+| rag.py | Contributor 5 |
+| app.py | Contributor 1 |
+| demo_script.md, SOW, integration | Contributor 6 |
 | config.py | shared, do not edit |

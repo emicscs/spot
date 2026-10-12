@@ -1,4 +1,4 @@
-"""Database layer for Spot. Owner: Person 1. See CONTRACTS.md."""
+"""Database layer for Spot. Owner: Contributor 2. See CONTRACTS.md."""
 import sqlite3
 
 import config
