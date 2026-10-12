@@ -3,11 +3,27 @@ import sqlite3
 
 import config
 
-USERS = {
-    "alice": {"name": "alice", "team": "Ops Automation", "role": "Approver"},
-    "bob": {"name": "bob", "team": "Ops Automation", "role": "Contributor"},
-    "carol": {"name": "carol", "team": "Payments", "role": "Reader"},
-    "dave": {"name": "dave", "team": "Payments", "role": "Approver"},
+USERS = {  # fictional people; keys are "first.last"
+    "priya.raman": {"name": "priya.raman", "display_name": "Priya Raman", "title": "Technical Program Manager",
+                    "team": "Ops Automation", "role": "Approver", "avatar_color": "#8764B8"},
+    "marcus.chen": {"name": "marcus.chen", "display_name": "Marcus Chen", "title": "Infrastructure Engineer",
+                    "team": "Ops Automation", "role": "Contributor", "avatar_color": "#0F6CBD"},
+    "elena.rossi": {"name": "elena.rossi", "display_name": "Elena Rossi", "title": "Business Analyst",
+                    "team": "Payments", "role": "Reader", "avatar_color": "#C239B3"},
+    "daniel.okafor": {"name": "daniel.okafor", "display_name": "Daniel Okafor", "title": "Engineering Manager",
+                      "team": "Payments", "role": "Approver", "avatar_color": "#0E700E"},
+    "sofia.alvarez": {"name": "sofia.alvarez", "display_name": "Sofia Alvarez", "title": "Program Director",
+                      "team": "Program Office", "role": "Reader", "avatar_color": "#C4314B"},
+    "james.whitfield": {"name": "james.whitfield", "display_name": "James Whitfield", "title": "Security Architect",
+                        "team": "Information Security", "role": "Reader", "avatar_color": "#4F6BED"},
+    "aisha.karimi": {"name": "aisha.karimi", "display_name": "Aisha Karimi", "title": "Compliance Lead",
+                     "team": "Compliance & Legal", "role": "Reader", "avatar_color": "#CA5010"},
+    "tomas.novak": {"name": "tomas.novak", "display_name": "Tomas Novak", "title": "Network Engineer",
+                    "team": "Network Engineering", "role": "Reader", "avatar_color": "#038387"},
+    "hannah.brooks": {"name": "hannah.brooks", "display_name": "Hannah Brooks", "title": "Project Coordinator",
+                      "team": "Program Office", "role": "Reader", "avatar_color": "#986F0B"},
+    "ravi.menon": {"name": "ravi.menon", "display_name": "Ravi Menon", "title": "Site Reliability Engineer",
+                   "team": "Ops Automation", "role": "Reader", "avatar_color": "#5C2E91"},
 }
 
 TABLES = ("docs", "proposals", "history", "team_dependencies")
@@ -102,7 +118,7 @@ def drop_tables():
 
 
 def get_user(name):
-    """Returns {"name", "team", "role"} or None."""
+    """Returns {"name", "display_name", "title", "team", "role", "avatar_color"} or None."""
     user = USERS.get(name)
     return dict(user) if user else None
 
@@ -180,9 +196,9 @@ if __name__ == "__main__":
         now = "2026-10-01T09:00:00+00:00"
         docs = [
             ("ops-uae-gateway", "UAE Payment Gateway Requirements", "Ops Automation",
-             "Gateway routing requires dual-region active-active deployment.", 1, "bob", "alice", now),
+             "Gateway routing requires dual-region active-active deployment.", 1, "marcus.chen", "priya.raman", now),
             ("pay-core-routing", "Payment Core Transaction Routing Specification", "Payments",
-             "Specifies ISO 20022 message routing.", 1, "dave", "dave", now),
+             "Specifies ISO 20022 message routing.", 1, "daniel.okafor", "daniel.okafor", now),
         ]
         for doc in docs:
             execute(
@@ -196,7 +212,7 @@ if __name__ == "__main__":
             "INSERT INTO proposals (proposal_id, doc_id, new_content, summary, deadline, proposed_by, "
             "required_team, status, approved_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (str(uuid.uuid4()), "ops-uae-gateway", "Updated gateway content.", "Move cutover up one week",
-             "2026-11-01T17:00:00+00:00", "bob", "Payments", "pending", None, now),
+             "2026-11-01T17:00:00+00:00", "marcus.chen", "Payments", "pending", None, now),
         )
 
     def _snapshot():
@@ -216,17 +232,17 @@ if __name__ == "__main__":
     source = _do_reset()
     print("Seeded via:", source)
 
-    carol_docs = get_docs_for_user("carol")
+    carol_docs = get_docs_for_user("elena.rossi")
     carol_teams = sorted({d["team"] for d in carol_docs})
-    print("carol sees", len(carol_docs), "docs from teams:", carol_teams)
+    print("elena.rossi sees", len(carol_docs), "docs from teams:", carol_teams)
     assert carol_teams == ["Ops Automation", "Payments"], carol_teams
 
-    bob_teams = sorted({d["team"] for d in get_docs_for_user("bob")})
-    print("bob sees teams:", bob_teams)
+    bob_teams = sorted({d["team"] for d in get_docs_for_user("marcus.chen")})
+    print("marcus.chen sees teams:", bob_teams)
     assert bob_teams == ["Ops Automation"], bob_teams
 
     assert get_docs_for_user("nobody") == []
-    assert get_user("alice") == {"name": "alice", "team": "Ops Automation", "role": "Approver"}
+    assert get_user("priya.raman") == USERS["priya.raman"]
     assert get_user("zed") is None
 
     deps = get_dependent_teams("Ops Automation")
@@ -236,8 +252,8 @@ if __name__ == "__main__":
 
     pending = get_pending()
     print("pending proposals:", len(pending))
-    assert len(pending) == 1 and pending[0]["status"] == "pending"
-    assert get_proposals(pending[0]["doc_id"])[0]["proposal_id"] == pending[0]["proposal_id"]
+    assert len(pending) == 2 and all(p["status"] == "pending" for p in pending)
+    assert any(p["proposal_id"] == pending[0]["proposal_id"] for p in get_proposals(pending[0]["doc_id"]))
 
     doc = get_doc(pending[0]["doc_id"])
     assert doc is not None and doc["doc_id"] == pending[0]["doc_id"]

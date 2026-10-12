@@ -1,63 +1,49 @@
 # Spot demo script
 
-Click-by-click against the real app (`app.py` with `USE_FAKES = False`, the real `db`/`governance`/`rag`). Run `http://localhost:8501`, use the account menu (top right) to switch users, and **Reset demo** from that same menu before each rehearsal.
+Click-by-click. Start the app with `python app.py` (every start is a clean demo), open http://localhost:8501, and click **Reset demo** (top bar) between rehearsals. All people and conversations are fictional.
 
-Demo doc: `ops-uae-identity` — "UAE Identity Service Integration Scope" (Ops Automation, v1, author **bob**, approver **alice**). Current content states the cutover date as **November 14, 2026**.
+Demo doc: `ops-uae-identity`, "UAE Identity Service Integration Scope" (Ops Automation, v1). v1 says the cutover is **November 14, 2026**. The seeded proposal moves it to **November 28, 2026**.
 
-Demo question (type it verbatim, every time): **"What is the cutover date for the UAE identity service?"**
-
-The UI is a Teams chat: a **Spot** DM (talk to it directly, no @mention needed) plus **Ops Automation** and **Payments** group chats (mention **@Spot** there). Cards (propose form, approval request, history, answer) render inline as real Adaptive Cards.
+Demo question (ask it verbatim, every time): **"What is the cutover date for the UAE identity service?"**
 
 ---
 
-## 1. Propose
+## 1. Propose: the decision nobody wrote down
 
-1. Account menu (top right): switch to **bob**. Toast: "Signed in as bob · Ops Automation Contributor".
-2. Open the **Spot** chat (left rail, top item — it's the default). Type the demo question and send.
-   - Spot replies with an Answer card: cutover date **November 14, 2026**, sources chip *UAE Identity Service Integration Scope · v1 · by bob · approved by alice*.
-3. In the same **Spot** chat, type `propose identity` and send.
-   - Spot opens a **Propose a change** card for "UAE Identity Service Integration Scope", showing "Current: v1, approved by alice."
-4. In the **New content** field, edit the cutover sentence from "...scheduled for November 14, 2026." to "...scheduled for **November 28, 2026**." (leave the rest of the paragraph unchanged).
-5. **What changed and why**: type exactly — `Cutover moved two weeks per Infra meeting 10/9`
-6. **Approval needed by**: leave the default (`2026-10-19` — today + 7 days).
-7. Click **Submit for approval**.
-   - Spot replies in the DM: **"Routed to Payments (depends on Ops Automation). I've asked them in the Payments chat."**
-   - The same approval-request card is posted into the **Payments** group chat.
-8. Still as bob, ask the demo question again in the **Spot** DM.
-   - Spot still answers **November 14, 2026**, v1 — the pending proposal is never used in answers.
+1. Top bar: **Signed in as → Marcus Chen (Ops Automation · Contributor)**.
+2. Left list, **Chats → Cutover sync (call recap)**.
+3. Say: "Yesterday Payments, Network and the program office decided on a call to move the UAE identity cutover two weeks. Nobody from Ops Automation was on it."
+4. Point at Daniel's message: *"Decision from the call: the UAE identity service cutover is moving two weeks, from November 14 to November 28."*
+5. Point at the system line: *"Sofia Alvarez added Marcus Chen and Priya Raman to the chat."* (after Sofia's angry ping in Program Office).
+6. In Daniel's thread: Marcus replied **"@Spot add"**, and Spot answered in-thread: *"Proposal created: UAE identity service cutover moved two weeks. Routed to Payments (depends on Ops Automation)."* with the approval card.
+7. On the card, point at **Changes**: November ~~14~~ **28**, the deadline, and **Routed to: Payments (depends on Ops Automation)**.
+8. Optional: **Spot (rail) → Chat**, type `ask What is the cutover date for the UAE identity service?` Spot still answers **November 14**, v1, because the change isn't approved.
 
-## 2. Review
+## 2. Review: only the dependent team can approve
 
-1. Account menu: switch to **alice** (Ops Automation · Approver).
-2. Open the **Payments** chat. Find the card: **"Approval requested from Payments"**, summary "Cutover moved two weeks per Infra meeting 10/9", facts: Document / Proposed by bob / Deadline 2026-10-19 / Routed to Payments (depends on Ops Automation).
-3. Click **Approve**.
-   - Blocked, shown inline under the card: **"Only Payments can approve: Payments depends on Ops Automation (alice is on Ops Automation)."** Alice's own team cannot approve a change that another team depends on.
-4. Account menu: switch to **dave** (Payments · Approver).
-5. Open the **Payments** chat — same card. Point out the side-by-side diff columns: CURRENT · APPROVED ("...November 14, 2026...") vs. PROPOSED ("...November 28, 2026...") with the changed line highlighted.
-6. Click **Approve**.
-   - Spot posts: **"dave approved. UAE Identity Service Integration Scope is now v2 and recorded in History."**
-   - The card itself updates in place: title turns green — "Approved by dave" — with the line "✅ Binding now. UAE Identity Service Integration Scope is v2, changed by bob, approved by dave."
+1. **Signed in as → Priya Raman (Ops Automation · Approver)**.
+2. On the same card, click **Approve**.
+   - Blocked under the card: **"Only Payments can approve: Payments depends on Ops Automation"**.
+3. Say: "Ops can't sign off its own change when Payments depends on it."
+4. **Signed in as → Daniel Okafor (Payments · Approver)**. The **Activity** bell shows a badge; click it, then the request to jump to the thread.
+5. Click **Approve** on the card. The card flips to **"✓ Approved by Daniel Okafor"** and Spot replies: *"Daniel Okafor approved. UAE Identity Service Integration Scope is now v2 and recorded in History."*
 
-## 3. Merge
+## 3. Merge: the answer moves with the approved doc
 
-1. Account menu: switch back to **bob** (or stay as dave — same approved content either way).
-2. In the **Spot** DM, ask the exact same demo question again.
-   - Spot now answers **November 28, 2026**, sources chip *UAE Identity Service Integration Scope · v2 · by bob · approved by dave*.
-3. Say the line: "Same question, same chat — the answer moved because the doc moved. v2, changed by bob, approved by dave."
+1. **Spot (rail) → Chat**, ask the demo question again.
+2. Spot answers **November 28, 2026**, citing *UAE Identity Service Integration Scope · v2 · by Marcus Chen · approved by Daniel Okafor*.
 
-## 4. Receipt
+## 4. Receipt: History, and what isn't binding
 
-1. Account menu: switch to **carol** (Payments · Reader).
-2. In the **Spot** DM, type `history identity` and send.
-   - History card: "UAE Identity Service Integration Scope", "Ops Automation · current v2, approved by dave." One row: **v2 · CURRENT**, summary "Cutover moved two weeks per Infra meeting 10/9", "changed by bob · approved by dave · 2026-10-12 · deadline 2026-10-19." (v1 does not get its own row — History only records approved *changes*, and v1 was the seeded starting state, never itself an approved proposal.)
-   - Point out: carol is a Reader and never touched Approve/Reject — this is a read-only receipt. History is the receipt: a team is only on the hook for changes it approved.
-3. Type `history gateway` and send — the *other* UAE doc.
-   - No approved-version rows at all (same reason — v1 is seed data, nothing has been approved on this doc yet). Straight to **"NOT APPROVED: NOT BINDING"** — "**Pending:** Move UAE gateway cutover up one week" / "proposed by bob · needs Payments · deadline 2026-11-01T17:00:00Z · Not approved: not binding."
-4. Say the line: "Two UAE docs, two different states — one merged, one still pending. Spot never lets a pending change answer a question or count as a decision."
+1. **Signed in as → Elena Rossi (Payments · Reader)**.
+2. **Spot (rail) → History**. It opens on *UAE Identity Service Integration Scope*: **v2 · Current**, changed by Marcus Chen, approved by Daniel Okafor, deadline Oct 16, 2026; below it the v1 original.
+3. Pick **UAE Payment Gateway Requirements** and click **Continue**. Under **"Not approved: not binding"**: *Pending: Move UAE gateway cutover up one week*, captured with "@Spot add" in the *UAE gateway readiness* chat but never approved.
+4. Say: "History is the receipt. Payments is on the hook for the identity date because Daniel approved it. Nobody is on the hook for the gateway change, because nobody approved it."
 
-## 5. Close: Teams Adaptive Card
+## 5. Close: production path
 
-1. Switch to the mockup image: `assets/adaptive_card_mockup.png`.
-2. Say: "Every card you just saw was a real Adaptive Card, rendered inside this app. In production, Payments doesn't open Spot to find it — this is pushed straight into their Teams channel the moment it routes, same card, same buttons."
-3. Card text (verbatim): *"Approval requested from Payments: UAE cutover scope change (Payments depends on Ops Automation). Deadline: 2026-10-19. Approve / Reject"*
-4. Close: "Propose, route, block the wrong approver, approve, and the receipt — all four of those just happened inside Teams, not a separate tool."
+"Everything you saw is a real Adaptive Card. In production Spot is a Teams bot: the same cards and Approve buttons work inside Microsoft Teams, roles come from Entra ID, and the dependency graph comes from Terraform and the service catalog." Optionally show the Adaptive Card mockup from Aarnav's SOW.
+
+---
+
+**Reset between rehearsals:** top bar → **Reset demo**.
