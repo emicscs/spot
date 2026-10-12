@@ -1,4 +1,4 @@
-"""Chat over approved docs for Spot. Owner: Person 4. See CONTRACTS.md.
+"""Chat over approved docs for Spot. Owner: Emilio. See CONTRACTS.md.
 
 Only approved content (the docs table) goes into the prompt. Never pending proposals.
 """

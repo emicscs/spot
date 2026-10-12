@@ -1,4 +1,4 @@
-"""Proposal / approval workflow for Spot. Owner: Person 3. See CONTRACTS.md.
+"""Proposal / approval workflow for Spot. Owner: Evan. See CONTRACTS.md.
 
 All permission failures raise PermissionError with a human-readable reason, e.g.
 "Only Payments can approve: Payments depends on Ops Automation".

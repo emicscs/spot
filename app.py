@@ -1,4 +1,4 @@
-"""Streamlit UI for Spot. Owner: Person 5. See CONTRACTS.md.
+"""Streamlit UI for Spot. Owner: Frankie. See CONTRACTS.md.
 
 Run: streamlit run app.py
 Tabs: Pending, History, Chat. Sidebar: user picker, team/role, Reset demo.
