@@ -165,12 +165,12 @@ img {
   isolation: isolate;
   display: grid;
   place-items: center;
-  width: 25px;
-  height: 27px;
+  width: 18px;
+  height: 20px;
   background: #6261b7;
   border-radius: 4px;
   color: white;
-  font-size: 19px;
+  font-size: 14px;
   font-weight: 700;
   box-shadow: 2px 2px 5px #46409724;
 }
@@ -179,11 +179,11 @@ img {
   content: "";
   position: absolute;
   z-index: -1;
-  width: 18px;
-  height: 25px;
+  width: 13px;
+  height: 18px;
   background: #8b89d7;
-  left: 18px;
-  top: 5px;
+  left: 13px;
+  top: 4px;
   border-radius: 4px 4px 8px 8px;
 }
 
@@ -191,10 +191,10 @@ img {
   position: absolute;
   background: #8b89d7;
   border-radius: 50%;
-  width: 10px;
-  height: 10px;
-  left: 20px;
-  top: -7px;
+  width: 7px;
+  height: 7px;
+  left: 15px;
+  top: -5px;
 }
 
 .workspace-brand>.brand-label {
