@@ -3,74 +3,67 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Spot | Mastercard workspace</title>
-  <link rel="icon" href="/static/icons/chat_multiple_24_regular.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#eeedf5">
+  <title>Spot · Mastercard workspace</title>
+  <link rel="icon" href="/static/spot-avatar.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/teams.css">
 </head>
 <body>
-  <nav class="rail" aria-label="Apps">
-    <div class="rail-logo" title="Workspace">
-      <span class="ic" style="--i:url(/static/icons/chat_multiple_24_regular.svg)"></span>
+  <header class="titlebar">
+    <div class="workspace-brand"><span class="teams-mark" aria-hidden="true">T<span></span></span><span>Microsoft Teams</span></div>
+    <div class="search-wrap">
+      <label class="tb-search" for="search"><span class="ic" style="--i:url(/static/icons/search_20_regular.svg)"></span><input id="search" placeholder="Search this workspace" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>Ctrl K</kbd></label>
+      <div class="search-results hidden" id="search-results" aria-label="Search results"></div>
     </div>
-    <button class="rail-item" data-view="activity">
-      <span class="ic" style="--i:url(/static/icons/alert_24_regular.svg)"></span><span>Activity</span>
-      <b class="badge hidden" id="activity-badge"></b>
-    </button>
-    <button class="rail-item" data-view="chat">
-      <span class="ic" style="--i:url(/static/icons/chat_24_regular.svg)"></span><span>Chat</span>
-    </button>
-    <button class="rail-item on" data-view="teams">
-      <span class="ic" style="--i:url(/static/icons/people_team_24_regular.svg)"></span><span>Teams</span>
-    </button>
-    <button class="rail-item" data-view="spot">
-      <span class="rail-spot" id="rail-spot"></span><span>Spot</span>
-    </button>
-  </nav>
-
-  <div class="main">
-    <header class="titlebar">
-      <div class="org" id="org"></div>
-      <label class="tb-search">
-        <span class="ic" style="--i:url(/static/icons/search_20_regular.svg)"></span>
-        <input placeholder="Search" aria-label="Search">
-      </label>
-      <div class="tb-right">
-        <label class="signed-in">Signed in as
-          <select id="user-select" aria-label="Signed in as"></select>
-        </label>
-        <button class="btn" id="reset">Reset demo</button>
-        <div id="me-avatar"></div>
+    <div class="tb-right">
+      <span class="demo-label"><i></i>Demo workspace</span>
+      <button class="reset-btn" id="reset" title="Restore the demo's original conversations and proposals">Reset demo</button>
+      <div class="user-wrap">
+        <button class="user-button" id="user-button" aria-haspopup="dialog" aria-expanded="false" aria-label="Signed in as"><span class="user-copy"><small>Signed in as</small><strong id="user-name">Loading…</strong></span><span id="me-avatar"></span><span class="ic sm" style="--i:url(/static/icons/chevron_down_16_regular.svg)"></span></button>
+        <select id="user-select" class="sr-only" aria-label="Signed in as" tabindex="-1"></select>
+        <div class="user-menu hidden" id="user-menu" role="dialog" aria-label="Switch demo user"></div>
       </div>
-    </header>
-
-    <div class="body">
-      <aside class="list">
-        <div class="list-scroll" id="list"></div>
-        <div class="demo-note">Demo data: fictional people and conversations</div>
-      </aside>
-
-      <section class="panel">
-        <div class="head" id="head"></div>
-        <div class="feed" id="feed"></div>
-        <div class="composer" id="composer">
-          <div class="popup hidden" id="popup" role="listbox"></div>
-          <div class="replying hidden" id="replying"></div>
-          <div class="compose-box">
-            <textarea id="compose" rows="1" placeholder="Start a post"></textarea>
-            <div class="compose-icons">
-              <span class="ic" style="--i:url(/static/icons/text_font_20_regular.svg)"></span>
-              <span class="ic" style="--i:url(/static/icons/emoji_20_regular.svg)"></span>
-              <span class="ic" style="--i:url(/static/icons/attach_20_regular.svg)"></span>
-              <button class="send" id="send" aria-label="Send"><span class="ic" style="--i:url(/static/icons/send_24_filled.svg)"></span></button>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
+  </header>
+  <div class="app-shell">
+    <nav class="rail" aria-label="Apps">
+      <button class="rail-item" data-view="activity" title="Activity"><span class="ic" style="--i:url(/static/icons/alert_24_regular.svg)"></span><span>Activity</span><b class="badge hidden" id="activity-badge"></b></button>
+      <button class="rail-item on" data-view="chat" title="Chats"><span class="ic" style="--i:url(/static/icons/chat_24_regular.svg)"></span><span>Chat</span></button>
+      <button class="rail-item" data-view="teams" title="Teams and channels"><span class="ic" style="--i:url(/static/icons/people_team_24_regular.svg)"></span><span>Teams</span></button>
+      <div class="rail-divider"></div>
+      <button class="rail-item" data-view="spot" title="Spot · requirements version control"><span class="rail-spot" id="rail-spot"><img src="/static/spot-avatar.svg" alt=""></span><span>Spot</span></button>
+      <span class="rail-bottom" title="Mastercard workspace"><span class="mastercard-mark" aria-hidden="true"></span></span>
+    </nav>
+    <main class="main">
+      <div class="body">
+        <aside class="list" id="sidebar" aria-label="Conversations">
+          <div class="org" id="org"></div>
+          <div class="list-scroll" id="list"><div class="loading">Loading your workspace…</div></div>
+          <div class="demo-note"><span class="demo-dot"></span>Fictional people. Real approvals.</div>
+        </aside>
+        <section class="panel" aria-label="Conversation">
+          <div class="head" id="head"></div>
+          <div class="feed" id="feed" aria-label="Messages" aria-busy="true"><div class="loading">Opening your conversation…</div></div>
+          <div class="composer" id="composer">
+            <div class="popup hidden" id="popup" role="listbox" aria-label="Message suggestions"></div>
+            <div class="replying hidden" id="replying"></div>
+            <div class="compose-box">
+              <textarea id="compose" rows="1" placeholder="Type a message…" aria-label="Write a message"></textarea>
+              <div class="compose-bottom"><div class="compose-icons">
+                <button class="icon-button" id="format" title="Bold selected text" aria-label="Bold selected text"><span class="ic" style="--i:url(/static/icons/text_font_20_regular.svg)"></span></button>
+                <button class="icon-button" id="emoji" title="Add an emoji" aria-label="Add an emoji"><span class="ic" style="--i:url(/static/icons/emoji_20_regular.svg)"></span></button>
+                <button class="spot-mention" id="mention" title="Mention Spot">@<span>Spot</span></button>
+              </div><div class="send-area"><span class="send-hint">Enter to send</span><button class="send" id="send" aria-label="Send message" disabled><span class="ic" style="--i:url(/static/icons/send_24_filled.svg)"></span></button></div></div>
+            </div>
+            <div class="composer-note"><img src="/static/spot-avatar.svg" alt=""><span>Turn a conversation into a decision. Mention <button id="composer-spot">@Spot</button> to get started.</span><span class="shift-hint">Shift + Enter for a new line</span></div>
+          </div>
+        </section>
+      </div>
+    </main>
   </div>
-
-  <div class="toast hidden" id="toast"></div>
-
+  <div class="drawer-backdrop hidden" id="drawer-backdrop"></div>
+  <aside class="drawer hidden" id="drawer" role="dialog" aria-modal="true" aria-label="Conversation details" tabindex="-1"></aside>
+  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
   <script src="/static/vendor/adaptivecards.min.js"></script>
   <script src="/static/spot.js"></script>
 </body>
