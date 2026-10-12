@@ -206,7 +206,7 @@ def render_sidebar():
         user = st.selectbox("Signed in as", USERS, key="user")
         info = db.get_user(user)
         st.markdown(f"**{info['team']}** · {info['role']}")
-        if st.button("Reset demo", use_container_width=True):
+        if st.button("Reset demo", width="stretch"):
             db.reset()
             for key in list(st.session_state):
                 if key.startswith("chat_"):
@@ -316,7 +316,7 @@ def render_history(user):
           "Approved by": h["approved_by"], "Summary": h["summary"],
           "Deadline": h["deadline"] or "", "Date": (h["changed_at"] or "")[:10]}
          for h in db.get_history(doc_id)],
-        hide_index=True, use_container_width=True)
+        hide_index=True, width="stretch")
 
     open_or_rejected = [p for p in db.get_proposals(doc_id) if p["status"] != "approved"]
     if open_or_rejected:
@@ -330,7 +330,23 @@ def render_history(user):
 
 def render_chat(user):
     """Chat tab: question box, calls rag.ask, shows answer and sources. Returns None."""
-    st.info("Ask Spot: coming next")
+    log = st.session_state.setdefault(f"chat_{user}", [])
+    st.caption("Answers come only from approved documents you can see. "
+               "Pending proposals are never used.")
+    with st.form("ask_form", clear_on_submit=True):
+        question = st.text_input("Ask Spot", placeholder="What is the cutover date for "
+                                                         "the UAE identity service?")
+        if st.form_submit_button("Ask", type="primary") and question.strip():
+            with st.spinner("Reading approved docs..."):
+                log.append({"question": question, **rag.ask(user, question)})
+    for turn in reversed(log):
+        with st.chat_message("user"):
+            st.markdown(turn["question"])
+        with st.chat_message("assistant", avatar="📍"):
+            st.markdown(turn["answer"])
+            for s in turn["sources"]:
+                st.caption(f"📄 {s['title']} · v{s['version']} · by {s['author']} · "
+                           f"approved by {s['approver']}")
 
 
 def main():
