@@ -1,11 +1,18 @@
 """Chat over approved docs for Spot. Owner: Contributor 5. See CONTRACTS.md.
 
 Only approved content (the docs table) goes into the prompt. Never pending proposals.
+Cloud OpenAI is the default. Set LLM_LOCAL=1 to use an OpenAI-compatible local
+server (Ollama, LM Studio, llama.cpp) instead.
 """
+import os
+
 from openai import OpenAI
 
 import config
 import db
+
+_LOCAL_DEFAULT_BASE_URL = "http://localhost:11434/v1"
+_LOCAL_PLACEHOLDER_KEY = "local"
 
 INSTRUCTION = (
     "Answer only from these documents. Cite title, version, author, and approver "
@@ -24,6 +31,30 @@ def _format_doc(doc):
     )
 
 
+def _wants_local():
+    return os.getenv("LLM_LOCAL", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _llm_settings():
+    """Return (api_key, base_url, model) for the cloud or local client.
+
+    Local mode ignores a blank API key. Local servers do not check it, and the
+    OpenAI client refuses to start without one.
+    """
+    if not _wants_local():
+        return config.LLM_API_KEY, config.LLM_BASE_URL, config.LLM_MODEL
+
+    base_url = (
+        os.getenv("LLM_LOCAL_BASE_URL")
+        or config.LLM_BASE_URL
+        or _LOCAL_DEFAULT_BASE_URL
+    )
+    model = os.getenv("LLM_LOCAL_MODEL") or config.LLM_MODEL
+    if not model:
+        raise ValueError("Set LLM_LOCAL_MODEL or LLM_MODEL to the local model name.")
+    return config.LLM_API_KEY or _LOCAL_PLACEHOLDER_KEY, base_url, model
+
+
 def ask(user, question):
     """Answer a question from the docs the user may see.
     Returns {"answer": str,
@@ -32,9 +63,10 @@ def ask(user, question):
     documents = "\n\n".join(_format_doc(doc) for doc in docs)
     prompt = f"{INSTRUCTION}\n\n{documents}" if documents else INSTRUCTION
 
-    client = OpenAI(api_key=config.LLM_API_KEY, base_url=config.LLM_BASE_URL)
+    api_key, base_url, model = _llm_settings()
+    client = OpenAI(api_key=api_key, base_url=base_url)
     response = client.chat.completions.create(
-        model=config.LLM_MODEL,
+        model=model,
         messages=[
             {"role": "system", "content": prompt},
             {"role": "user", "content": question},
@@ -55,6 +87,9 @@ def ask(user, question):
 
 
 if __name__ == "__main__":
+    _, base_url, model = _llm_settings()
+    where = "local" if _wants_local() else "cloud"
+    print(f"model: {model or '(not set)'} ({where}) @ {base_url or 'OpenAI default'}")
     demo = "What is the cutover date for the UAE identity service?"
     off_topic = "What is the capital of France?"
     for question in (demo, off_topic):
