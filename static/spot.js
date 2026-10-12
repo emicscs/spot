@@ -644,6 +644,7 @@ document.addEventListener("click", async (e) => {
   if (!e.target.closest(".user-wrap")) setUserMenu(false);
   if (!e.target.closest(".search-wrap")) closeSearch();
   const t = e.target.closest("button,[data-cancel-reply]"); if (!t) return;
+  if (t.dataset.demoApp) { toast(`${t.dataset.demoApp} is a visual placeholder for this demo.`); return; }
   if (t.dataset.loc) { open(t.dataset.loc); return; }
   if (t.dataset.user) { switchUser(t.dataset.user); return; }
   if (t.dataset.person) { showPerson(t.dataset.person); return; }
