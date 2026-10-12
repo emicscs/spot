@@ -14,8 +14,8 @@ DOCS = [
         "Ops Automation",
         "The UAE Identity Service integrates digital ID verification for regional merchants and acquiring institutions. The cutover date for the UAE identity service is scheduled for November 14, 2026. Prior to cutover, automated credential rotation and staging sandbox verification must be finalized.",
         1,
-        "bob",
-        "alice",
+        "marcus.chen",
+        "priya.raman",
         "2026-10-01T09:00:00Z",
     ),
     (
@@ -24,8 +24,8 @@ DOCS = [
         "Ops Automation",
         "Defines protocol bridging between local UAE acquiring networks and central clearing channels. Gateway routing requires dual-region active-active deployment with sub-50ms failover.",
         1,
-        "bob",
-        "alice",
+        "marcus.chen",
+        "priya.raman",
         "2026-10-02T10:30:00Z",
     ),
     (
@@ -34,8 +34,8 @@ DOCS = [
         "Ops Automation",
         "Architecture reference for regional infrastructure zones, VPC peering across Middle East payment zones, and baseline firewall compliance requirements.",
         1,
-        "alice",
-        "alice",
+        "priya.raman",
+        "priya.raman",
         "2026-09-28T14:15:00Z",
     ),
     (
@@ -44,8 +44,8 @@ DOCS = [
         "Ops Automation",
         "Operating procedures for nightly reconciliation batch triggers, alerting thresholds, and automated retry mechanisms for transient network drops.",
         1,
-        "bob",
-        "alice",
+        "marcus.chen",
+        "priya.raman",
         "2026-09-30T11:00:00Z",
     ),
     (
@@ -54,8 +54,8 @@ DOCS = [
         "Payments",
         "Specifies ISO 20022 message transformation and routing across domestic switch participants. Dependent upon Ops Automation connectivity endpoints and network topology.",
         1,
-        "dave",
-        "dave",
+        "daniel.okafor",
+        "daniel.okafor",
         "2026-10-03T08:45:00Z",
     ),
     (
@@ -64,8 +64,8 @@ DOCS = [
         "Payments",
         "Business rules determining multi-currency net settlement cycles, fee calculation schedules, and end-of-day bank payout processing.",
         1,
-        "dave",
-        "dave",
+        "daniel.okafor",
+        "daniel.okafor",
         "2026-10-04T12:00:00Z",
     ),
     (
@@ -74,8 +74,8 @@ DOCS = [
         "Payments",
         "Threshold limits, real-time token scoring models, and step-up authentication rules for high-value cross-border merchant transfers.",
         1,
-        "carol",
-        "dave",
+        "elena.rossi",
+        "daniel.okafor",
         "2026-10-05T15:20:00Z",
     ),
     (
@@ -84,8 +84,8 @@ DOCS = [
         "Payments",
         "Standard operating procedure for handling cardholder dispute requests, evidence collection timelines, and arbitration escalations.",
         1,
-        "carol",
-        "dave",
+        "elena.rossi",
+        "daniel.okafor",
         "2026-10-06T16:10:00Z",
     ),
     (
@@ -94,8 +94,8 @@ DOCS = [
         "Payments",
         "Decision record confirming adoption of tokenized credentials for all MENA region acquiring connections, retiring legacy symmetric keys.",
         1,
-        "dave",
-        "dave",
+        "daniel.okafor",
+        "daniel.okafor",
         "2026-10-07T13:30:00Z",
     ),
 ]
@@ -104,23 +104,39 @@ DEPENDENCIES = [
     ("Payments", "Ops Automation"),
 ]
 
-PENDING_PROPOSAL = {
-    "proposal_id": str(uuid.uuid4()),
-    "doc_id": "ops-uae-gateway",
-    "new_content": "Defines protocol bridging between local UAE acquiring networks and central clearing channels. Cutover schedule moved up one week to accelerate pilot merchant onboarding. Gateway routing requires dual-region active-active deployment with sub-50ms failover.",
-    "summary": "Move UAE gateway cutover up one week",
-    "deadline": "2026-11-01T17:00:00Z",
-    "proposed_by": "bob",
-    "required_team": "Payments",
-    "status": "pending",
-    "approved_by": None,
-    "created_at": "2026-10-10T14:00:00Z",
-}
+# Fixed IDs from CONTRACTS.md: workspace.py messages link to these proposals.
+PENDING_PROPOSALS = [
+    {
+        "proposal_id": "3f2b8c1e-7a4d-4e9b-9c2f-5d1a6b8e0c47",
+        "doc_id": "ops-uae-identity",
+        "new_content": "The UAE Identity Service integrates digital ID verification for regional merchants and acquiring institutions. The cutover date for the UAE identity service is scheduled for November 28, 2026. Prior to cutover, automated credential rotation and staging sandbox verification must be finalized.",
+        "summary": "UAE identity service cutover moved two weeks",
+        "deadline": "2026-10-16",
+        "proposed_by": "marcus.chen",
+        "required_team": "Payments",
+        "status": "pending",
+        "approved_by": None,
+        "created_at": "2026-10-10T09:20:00Z",
+    },
+    {
+        "proposal_id": "a91d4f60-2c3b-4b7e-8f15-6e0c9d2b7a38",
+        "doc_id": "ops-uae-gateway",
+        "new_content": "Defines protocol bridging between local UAE acquiring networks and central clearing channels. Cutover schedule moved up one week to accelerate pilot merchant onboarding. Gateway routing requires dual-region active-active deployment with sub-50ms failover.",
+        "summary": "Move UAE gateway cutover up one week",
+        "deadline": "2026-10-20",
+        "proposed_by": "marcus.chen",
+        "required_team": "Payments",
+        "status": "pending",
+        "approved_by": None,
+        "created_at": "2026-10-10T14:07:00Z",
+    },
+]
 
 
 def seed():
     """Insert 8-10 seed docs (Ops Automation and Payments), the dependency row
-    ("Payments", "Ops Automation"), and one pending proposal on the UAE gateway doc.
+    ("Payments", "Ops Automation"), and the two pending proposals with the fixed
+    IDs from CONTRACTS.md (UAE identity cutover, UAE gateway cutover).
     Uses db.execute. Returns None."""
     for doc in DOCS:
         db.execute(
@@ -140,26 +156,19 @@ def seed():
             dep,
         )
 
-    db.execute(
-        """
-        INSERT INTO proposals (
-            proposal_id, doc_id, new_content, summary, deadline,
-            proposed_by, required_team, status, approved_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            PENDING_PROPOSAL["proposal_id"],
-            PENDING_PROPOSAL["doc_id"],
-            PENDING_PROPOSAL["new_content"],
-            PENDING_PROPOSAL["summary"],
-            PENDING_PROPOSAL["deadline"],
-            PENDING_PROPOSAL["proposed_by"],
-            PENDING_PROPOSAL["required_team"],
-            PENDING_PROPOSAL["status"],
-            PENDING_PROPOSAL["approved_by"],
-            PENDING_PROPOSAL["created_at"],
-        ),
-    )
+    for p in PENDING_PROPOSALS:
+        db.execute(
+            """
+            INSERT INTO proposals (
+                proposal_id, doc_id, new_content, summary, deadline,
+                proposed_by, required_team, status, approved_by, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                p["proposal_id"], p["doc_id"], p["new_content"], p["summary"], p["deadline"],
+                p["proposed_by"], p["required_team"], p["status"], p["approved_by"], p["created_at"],
+            ),
+        )
 
 
 def _init_tables_if_needed(conn):
@@ -261,13 +270,13 @@ if __name__ == "__main__":
 
     print(f"Total seeded docs: {doc_count} (expected 8-10)")
     print(f"Total dependencies: {dep_count} (expected 1)")
-    print(f"Total pending proposals: {proposal_count} (expected 1)")
+    print(f"Total pending proposals: {proposal_count} (expected 2)")
     print(f"Docs containing UAE identity service cutover: {len(uae_id_docs)} (expected exactly 1)")
     for row in uae_id_docs:
         print(f"  - [{row['doc_id']}] {row['title']}")
 
     assert doc_count >= 8 and doc_count <= 10, f"Expected 8-10 docs, got {doc_count}"
     assert dep_count == 1, f"Expected 1 dependency, got {dep_count}"
-    assert proposal_count == 1, f"Expected 1 pending proposal, got {proposal_count}"
+    assert proposal_count == 2, f"Expected 2 pending proposals, got {proposal_count}"
     assert len(uae_id_docs) == 1, f"Expected exactly 1 doc with UAE cutover date, got {len(uae_id_docs)}"
     print("All seed assertions passed!")
