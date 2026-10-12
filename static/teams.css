@@ -1,5 +1,6 @@
 /* Spot's Teams workspace. All assets are served locally. */
 :root {
+  color-scheme: light;
   --brand: #6260c9;
   --brand-hover: #4d4ab0;
   --brand-bg: #eeedf9;
@@ -15,6 +16,9 @@
   --stroke-strong: #d8d8e4;
   --red: #be4254;
   --green: #287956;
+  --warning: #ad570d;
+  --action-bg: #6260c9;
+  --action-hover: #4d4ab0;
   --shadow: 0 2px 8px #24243c05;
   --shadow-lg: 0 12px 40px #29264524;
   --font: "Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,"Helvetica Neue",sans-serif;
@@ -1313,13 +1317,13 @@ img {
 }
 
 .card-host .ac-pushButton.style-positive {
-  background: var(--brand);
-  border-color: var(--brand);
+  background: var(--action-bg);
+  border-color: var(--action-bg);
   color: #fff;
 }
 
 .card-host .ac-pushButton.style-positive:hover {
-  background: var(--brand-hover);
+  background: var(--action-hover);
 }
 
 .card-host .ac-pushButton:disabled {
@@ -1671,13 +1675,13 @@ img {
 }
 
 .send.ready {
-  background: var(--brand);
+  background: var(--action-bg);
   color: white;
   opacity: 1;
 }
 
 .send.ready:hover {
-  background: var(--brand-hover);
+  background: var(--action-hover);
 }
 
 .composer-note {
@@ -2150,13 +2154,13 @@ img {
 }
 
 .btn.primary {
-  background: var(--brand);
-  border-color: var(--brand);
+  background: var(--action-bg);
+  border-color: var(--action-bg);
   color: #fff;
 }
 
 .btn.primary:hover {
-  background: var(--brand-hover);
+  background: var(--action-hover);
 }
 
 .toast {
@@ -2173,6 +2177,171 @@ img {
   z-index: 60;
   font-size: 12px;
   max-width: calc(100vw - 32px);
+}
+
+/* Dark theme: native controls and Adaptive Card colors use the same palette. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --brand: #b4a6f4;
+  --brand-hover: #c9baff;
+  --brand-bg: #343046;
+  --text: #e9e7ef;
+  --subtle: #b0adbf;
+  --faint: #9591a7;
+  --chrome: #1b1b23;
+  --list: #202029;
+  --feed: #18181f;
+  --card: #25252f;
+  --hover: #30303d;
+  --stroke: #383744;
+  --stroke-strong: #4c495d;
+  --red: #ff97a8;
+  --green: #85d3a6;
+  --warning: #f3bd75;
+  --action-bg: #6e60bf;
+  --action-hover: #7c6dce;
+  --shadow: 0 2px 8px #00000018;
+  --shadow-lg: 0 12px 40px #00000060;
+}
+
+.theme-toggle {
+  flex: none;
+}
+
+.theme-toggle[aria-pressed="true"] {
+  color: var(--brand);
+}
+
+[data-theme="dark"] :is(.titlebar,.body,.tb-search,.tb-search kbd,.reset-btn,.compose-box,.card-host,.spot-nav,.spot-summary,.quick-prompt,.filter-chip.on,.msg-head .tag,.chat-feed .replies,.member-row) {
+  border-color: var(--stroke);
+}
+
+[data-theme="dark"] :is(.org-logo,.head,.filter-chip:not(.on),.spot-nav .btn,.spot-link .count,.chat-feed .post>.msg>.msg-body>.msg-text,.card-host,.card-host .ac-pushButton:not(.style-positive),.card-host .ac-input,.card-host input,.card-host textarea,.card-host select,.spot-welcome,.act,.compose-box,.popup,.search-results,.user-menu,.file-list,.drawer,.btn:not(.primary)) {
+  background: var(--card);
+}
+
+[data-theme="dark"] :is(.tb-search,.file-table-head) {
+  background: var(--list);
+}
+
+[data-theme="dark"] .tb-search:focus-within {
+  background: var(--card);
+  border-color: var(--brand);
+}
+
+[data-theme="dark"] :is(.reset-btn:hover,.rail-item:hover,.rail-item.on) {
+  background: var(--hover);
+}
+
+[data-theme="dark"] :is(.ch-row.on,.chat-row.on) {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+[data-theme="dark"] :is(.spot-nav,.spot-summary,.quick-prompt,.mention,.msg-head .tag,.replying,.role-pill) {
+  background: var(--brand-bg);
+}
+
+[data-theme="dark"] .chat-feed .post.own>.msg>.msg-body>.msg-text {
+  background: var(--brand-bg);
+  border-color: #484057;
+}
+
+[data-theme="dark"] :is(.replies,.chat-feed .replies) {
+  background: var(--card);
+}
+
+[data-theme="dark"] .chat-feed .replies {
+  border-left-color: #8170b8;
+}
+
+[data-theme="dark"] .chat-feed .replies .msg+.msg {
+  border-top-color: var(--stroke);
+}
+
+[data-theme="dark"] :is(.reply-link:hover,.quick-prompt:hover,.act:hover,.file-row:hover) {
+  background: var(--hover);
+  border-color: var(--stroke-strong);
+}
+
+[data-theme="dark"] :is(.card-host .ac-pushButton:not(.style-positive):hover,.btn:not(.primary):hover) {
+  background: var(--hover);
+}
+
+[data-theme="dark"] :is(.group-av .av,.member-stack .av,.presence) {
+  border-color: var(--card);
+}
+
+[data-theme="dark"] .rail-divider {
+  background: var(--stroke);
+}
+
+[data-theme="dark"] .mastercard-mark:after {
+  mix-blend-mode: normal;
+  opacity: .9;
+}
+
+[data-theme="dark"] :is(.section,.demo-note,.eyebrow,.conversation-intro .ic,.system .ic,.empty .ic,.ch-row .channel-hash,.send-hint,.send:not(.ready),.shift-hint,.composer-note) {
+  color: var(--faint);
+}
+
+[data-theme="dark"] :is(.mention,.thread-label,.msg-head .tag,.spot-summary strong,.spot-mention,.composer-note button,.quick-prompt,.role-pill,.file-name .ic) {
+  color: var(--brand);
+}
+
+[data-theme="dark"] .spot-summary span:not(.role-pill),
+[data-theme="dark"] .compose-box textarea::placeholder {
+  color: var(--subtle);
+}
+
+[data-theme="dark"] .role-pill.approver {
+  color: #96d3ae;
+  background: #263b31;
+}
+
+[data-theme="dark"] .approved-pill {
+  background: #263b31;
+}
+
+[data-theme="dark"] .card-error {
+  background: #40252d;
+  color: #ffadba;
+}
+
+[data-theme="dark"] .drawer-backdrop {
+  background: #00000065;
+}
+
+[data-theme="dark"] .compose-box:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px #b4a6f41a;
+}
+
+[data-theme="dark"] .chat-feed .post.own>.msg>.msg-body>.msg-head:after {
+  color: var(--subtle);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background-color: #4c495b;
+}
+
+@media(max-width:760px) {
+  .titlebar .tb-right {
+    gap: 7px;
+  }
+  .theme-toggle {
+    width: 26px;
+    height: 28px;
+  }
+}
+
+@media(max-width:380px) {
+  .titlebar .search-wrap {
+    min-width: 45px;
+  }
+  .titlebar .reset-btn {
+    padding: 5px 4px;
+  }
 }
 
 @media(min-width:1600px) {

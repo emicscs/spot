@@ -6,6 +6,24 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 function store(key, value) {
   try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch { return null; }
 }
+const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+function applyTheme(theme, save = false) {
+  document.documentElement.dataset.theme = theme;
+  if (save) store("spot.theme", theme);
+  const dark = theme === "dark";
+  const toggle = $("#theme-toggle");
+  toggle.setAttribute("aria-pressed", String(dark));
+  toggle.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+  toggle.title = dark ? "Switch to light mode" : "Switch to dark mode";
+  toggle.innerHTML = icon(dark ? "weather_sunny_20_regular" : "weather_moon_20_regular");
+  $("meta[name='theme-color']").content = dark ? "#1b1b23" : "#eeedf5";
+  const scrollTop = $("#feed").scrollTop;
+  refreshCardThemes();
+  $("#feed").scrollTo({ top: scrollTop, behavior: "instant" });
+}
+systemTheme.addEventListener("change", (e) => {
+  if (!["light", "dark"].includes(store("spot.theme"))) applyTheme(e.matches ? "dark" : "light");
+});
 const COMMANDS = [
   ["add", "Reply to a message to capture its decision"],
   ["propose", "Propose a change to your team's requirements"],
@@ -61,30 +79,34 @@ function empty(title, copy, glyph = "checkmark_circle_16_filled") {
 // ---------------------------------------------------------------- Adaptive Cards
 
 const fg = (d, s = d) => ({ default: d, subtle: s });
-const COLORS = {
-  default: fg("#242424", "#616161"), dark: fg("#242424", "#616161"), light: fg("#FFFFFF", "#F5F5F5"),
-  accent: fg("#5B5FC7", "#4F52B2"), good: fg("#0E700E", "#0E700E"), warning: fg("#BC4B09", "#BC4B09"),
-  attention: fg("#C4314B", "#C4314B"),
-};
 const FONT = "'Segoe UI', 'Segoe UI Web (West European)', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif";
-const HOST = new AdaptiveCards.HostConfig({
-  fontFamily: FONT,
-  supportsInteractivity: true,
-  spacing: { small: 4, default: 8, medium: 12, large: 16, extraLarge: 24, padding: 20 },
-  separator: { lineThickness: 1, lineColor: "#E0E0E0" },
-  fontSizes: { small: 11, default: 12, medium: 14, large: 17, extraLarge: 24 },
-  fontWeights: { lighter: 300, default: 400, bolder: 600 },
-  containerStyles: {
-    default: { backgroundColor: "#FFFFFF", foregroundColors: COLORS },
-    emphasis: { backgroundColor: "#F5F5F5", foregroundColors: COLORS },
-  },
-  actions: { maxActions: 5, spacing: "default", buttonSpacing: 8, actionsOrientation: "horizontal", actionAlignment: "left",
-    showCard: { actionMode: "inline", inlineTopMargin: 12, style: "emphasis" } },
-  factSet: { title: { weight: "bolder", size: "default", color: "default", wrap: true, maxWidth: 120 },
-    value: { size: "default", color: "default", wrap: true }, spacing: 12 },
-  inputs: { label: { inputSpacing: "small", requiredInputs: { weight: "bolder", suffix: " *", suffixColor: "attention" },
-    optionalInputs: { weight: "bolder" } }, errorMessage: { size: "small", color: "attention" } },
-});
+function createCardHostConfig() {
+  const style = getComputedStyle(document.documentElement);
+  const color = (name) => style.getPropertyValue(name).trim();
+  const colors = {
+    default: fg(color("--text"), color("--subtle")), dark: fg(color("--text"), color("--subtle")),
+    light: fg("#FFFFFF", "#F5F5F5"), accent: fg(color("--brand")), good: fg(color("--green")),
+    warning: fg(color("--warning")), attention: fg(color("--red")),
+  };
+  return new AdaptiveCards.HostConfig({
+    fontFamily: FONT,
+    supportsInteractivity: true,
+    spacing: { small: 4, default: 8, medium: 12, large: 16, extraLarge: 24, padding: 20 },
+    separator: { lineThickness: 1, lineColor: color("--stroke") },
+    fontSizes: { small: 11, default: 12, medium: 14, large: 17, extraLarge: 24 },
+    fontWeights: { lighter: 300, default: 400, bolder: 600 },
+    containerStyles: {
+      default: { backgroundColor: color("--card"), foregroundColors: colors },
+      emphasis: { backgroundColor: color("--hover"), foregroundColors: colors },
+    },
+    actions: { maxActions: 5, spacing: "default", buttonSpacing: 8, actionsOrientation: "horizontal", actionAlignment: "left",
+      showCard: { actionMode: "inline", inlineTopMargin: 12, style: "emphasis" } },
+    factSet: { title: { weight: "bolder", size: "default", color: "default", wrap: true, maxWidth: 120 },
+      value: { size: "default", color: "default", wrap: true }, spacing: 12 },
+    inputs: { label: { inputSpacing: "small", requiredInputs: { weight: "bolder", suffix: " *", suffixColor: "attention" },
+      optionalInputs: { weight: "bolder" } }, errorMessage: { size: "small", color: "attention" } },
+  });
+}
 
 AdaptiveCards.AdaptiveCard.onProcessMarkdown = (text, result) => {
   result.outputHtml = md(text);
@@ -93,7 +115,7 @@ AdaptiveCards.AdaptiveCard.onProcessMarkdown = (text, result) => {
 
 function renderCard(json, messageId, loc) {
   const card = new AdaptiveCards.AdaptiveCard();
-  card.hostConfig = HOST;
+  card.hostConfig = createCardHostConfig();
   card.onExecuteAction = (action) => {
     if (action instanceof AdaptiveCards.SubmitAction) runAction(messageId, action.data, loc);
   };
@@ -104,9 +126,36 @@ function renderCard(json, messageId, loc) {
 function cardHost(json, messageId, loc) {
   const host = document.createElement("div");
   host.className = "card-host";
+  host.spotCard = { json, messageId, loc };
   try { host.appendChild(renderCard(json, messageId, loc)); }
   catch (e) { host.textContent = `Card failed to render: ${e}`; }
   return host;
+}
+
+function refreshCardThemes() {
+  // Re-render inline card colors while retaining in-progress forms and expanded text.
+  document.querySelectorAll(".card-host").forEach((host) => {
+    if (!host.spotCard) return;
+    const fields = [...host.querySelectorAll("input,textarea,select")];
+    const values = fields.map((field) => ({ value: field.value, checked: field.checked }));
+    const focused = fields.indexOf(document.activeElement);
+    const selection = focused >= 0 ? [fields[focused].selectionStart, fields[focused].selectionEnd] : null;
+    const expanded = [...host.querySelectorAll('button[aria-expanded="true"]')].map((b) => b.textContent);
+    const { json, messageId, loc } = host.spotCard;
+    host.replaceChildren(renderCard(json, messageId, loc));
+    expanded.forEach((title) => [...host.querySelectorAll('button[aria-expanded="false"]')].find((b) => b.textContent === title)?.click());
+    const nextFields = [...host.querySelectorAll("input,textarea,select")];
+    nextFields.forEach((field, i) => {
+      if (!values[i]) return;
+      field.value = values[i].value;
+      if (field.type === "checkbox" || field.type === "radio") field.checked = values[i].checked;
+    });
+    if (focused >= 0 && nextFields[focused]) {
+      nextFields[focused].focus({ preventScroll: true });
+      if (selection[0] !== null) nextFields[focused].setSelectionRange(...selection);
+    }
+    if (S.busy) host.querySelectorAll(".ac-pushButton").forEach((b) => { b.disabled = true; });
+  });
 }
 
 function errorBox(text) {
@@ -513,6 +562,7 @@ document.addEventListener("click", async (e) => {
     store("spot.loc", S.loc); restoreDraft(); loadMain(S.view === "spot" ? "top" : "bottom"); return;
   }
   switch (t.id) {
+    case "theme-toggle": applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark", true); break;
     case "reset": {
       if (!canNavigate()) return;
       S.busy = true; t.disabled = true;
@@ -589,4 +639,5 @@ async function init() {
     $("#composer").classList.add("hidden"); toast(error.message);
   }
 }
+applyTheme(document.documentElement.dataset.theme);
 init();

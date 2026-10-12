@@ -4,6 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#eeedf5">
+  <script>
+    // Apply the saved/system theme before styles paint to avoid a light flash.
+    (() => {
+      let theme;
+      try { theme = localStorage.getItem("spot.theme"); } catch {}
+      document.documentElement.dataset.theme = theme === "light" || theme === "dark"
+        ? theme : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    })();
+  </script>
   <title>Spot · Mastercard workspace</title>
   <link rel="icon" href="/static/spot-avatar.png" type="image/png">
   <link rel="stylesheet" href="/static/teams.css">
@@ -17,6 +26,7 @@
     </div>
     <div class="tb-right">
       <span class="demo-label"><i></i>Demo workspace</span>
+      <button class="icon-button theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode"><span class="ic" style="--i:url(/static/icons/weather_moon_20_regular.svg)"></span></button>
       <button class="reset-btn" id="reset" title="Restore the demo's original conversations and proposals">Reset demo</button>
       <div class="user-wrap">
         <button class="user-button" id="user-button" aria-haspopup="dialog" aria-expanded="false" aria-label="Signed in as"><span class="user-copy"><small>Signed in as</small><strong id="user-name">Loading…</strong></span><span id="me-avatar"></span><span class="ic sm" style="--i:url(/static/icons/chevron_down_16_regular.svg)"></span></button>

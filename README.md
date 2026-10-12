@@ -31,6 +31,8 @@ The **Files** tab shows approved documents available to the signed-in user's tea
 open a document to read its current version or jump to its history. The profile
 menu in the top bar switches demo users and shows their team and approval role.
 Portrait sources are recorded in [static/avatars/README.md](static/avatars/README.md).
+Use the sun/moon button in the top bar to switch light and dark mode. Your choice
+is remembered in this browser; until you choose, the app follows your system theme.
 After backend changes, restart the Flask server before refreshing the browser.
 
 ## Contract
