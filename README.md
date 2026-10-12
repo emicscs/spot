@@ -6,7 +6,7 @@ Version control for project requirements, for a Mastercard program with many int
 - It is routed to the teams that depend on the doc's team (like CODEOWNERS).
 - Only an **Approver** on that team can approve or reject it.
 - Approval creates a new doc version and a **history** row (like a commit). History is the receipt: a team is only on the hook for changes it approved.
-- **Chat** answers questions from the current *approved* docs only. Pending proposals are never used in answers.
+- **@Spot ask** answers questions from the current *approved* docs only. Pending proposals are never used in answers.
 
 ## Setup
 
@@ -18,8 +18,10 @@ cp .env.example .env   # then fill in LLM_API_KEY and LLM_MODEL
 ## Run
 
 ```bash
-streamlit run app.py
+python app.py
 ```
+
+Open http://localhost:8501. The UI looks like Microsoft Teams: chat with **Spot** directly, or mention **@Spot** in the Ops Automation and Payments group chats. Switch demo users from the avatar menu (top right), which also has **Reset demo**.
 
 ## Contract
 
