@@ -564,6 +564,8 @@ def _spot_items(user, tab):
         return items
     docs = db.get_docs_for_user(user)
     ids = [d["doc_id"] for d in docs]
+    if not ids:
+        return []
     doc_id = view.get("history_doc") or ("ops-uae-identity" if "ops-uae-identity" in ids else ids[0])
     picker = _picker(docs, "Pick a document", "pick_history")["params"]
     picker["docs"].sort(key=lambda d: d["doc_id"] != doc_id)
