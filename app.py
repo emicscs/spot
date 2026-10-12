@@ -201,7 +201,18 @@ USERS = ["alice", "bob", "carol", "dave"]
 def render_sidebar():
     """Sidebar: user picker (4 users), shows team and role, Reset demo button.
     Returns the selected user name (str)."""
-    return "dave"
+    with st.sidebar:
+        st.caption("DEMO CONTROLS (not part of Teams)")
+        user = st.selectbox("Signed in as", USERS, key="user")
+        info = db.get_user(user)
+        st.markdown(f"**{info['team']}** · {info['role']}")
+        if st.button("Reset demo", use_container_width=True):
+            db.reset()
+            for key in list(st.session_state):
+                if key.startswith("chat_"):
+                    del st.session_state[key]
+            st.toast("Demo data reset")
+    return user
 
 
 def render_pending(user):
