@@ -6,7 +6,7 @@ Build against fake return values first; swap in real imports
 (db, governance, rag) at integration.
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import streamlit as st
@@ -219,7 +219,83 @@ def render_pending(user):
     """Pending tab: proposals with old vs new content, summary, deadline,
     routing line, Approve/Reject buttons (show PermissionError reason),
     and a Propose change form. Returns None."""
-    st.info("Approvals: coming next")
+    flash = st.session_state.pop("flash", None)
+    if flash:
+        st.success(flash)
+    render_propose_form(user)
+    pending = db.get_pending()
+    if not pending:
+        st.caption("No pending proposals.")
+    for p in pending:
+        render_proposal_card(user, p)
+
+
+def routing_line(p, doc):
+    """Human-readable reason a proposal went to its required_team."""
+    if p["required_team"] != doc["team"]:
+        return f"Routed to: {p['required_team']} (depends on {doc['team']})"
+    return f"Routed to: {p['required_team']} (no other team depends on it)"
+
+
+def render_proposal_card(user, p):
+    doc = db.get_doc(p["doc_id"])
+    with st.container(border=True):
+        st.markdown(f"**Approval requested from {p['required_team']}:** {p['summary']}")
+        st.caption(f"{doc['title']} · proposed by {p['proposed_by']} · deadline {p['deadline']}")
+        st.markdown(routing_line(p, doc))
+        old, new = st.columns(2)
+        old.markdown(f"**Current (v{doc['version']}, approved)**")
+        old.code(doc["content"], language=None, wrap_lines=True)
+        new.markdown("**Proposed**")
+        new.code(p["new_content"], language=None, wrap_lines=True)
+        approve_col, reject_col, _ = st.columns([1, 1, 5])
+        action = None
+        if approve_col.button("Approve", key=f"approve_{p['proposal_id']}", type="primary"):
+            action = "approve"
+        if reject_col.button("Reject", key=f"reject_{p['proposal_id']}"):
+            action = "reject"
+        if action:
+            try:
+                if action == "approve":
+                    version = governance.approve(user, p["proposal_id"])
+                    st.session_state.flash = (f"Approved by {user}: {doc['title']} "
+                                              f"is now v{version}")
+                else:
+                    governance.reject(user, p["proposal_id"])
+                    st.session_state.flash = f"Rejected by {user}: {p['summary']}"
+            except PermissionError as e:
+                st.error(f"Blocked: {e}")
+            else:
+                st.rerun()
+
+
+def render_propose_form(user):
+    me = db.get_user(user)
+    with st.expander("Propose a change"):
+        if me["role"] not in ("Contributor", "Approver"):
+            st.caption(f"{user} is a {me['role']} and can't propose changes.")
+            return
+        own = {d["doc_id"]: d for d in db.get_docs_for_user(user) if d["team"] == me["team"]}
+        doc_id = st.selectbox("Doc", list(own), key="propose_doc",
+                              format_func=lambda i: f"{own[i]['title']} (v{own[i]['version']})")
+        doc = own[doc_id]
+        with st.form(f"propose_{doc_id}_v{doc['version']}", clear_on_submit=True):
+            content = st.text_area("New content", value=doc["content"], height=150)
+            summary = st.text_input("Summary of the change")
+            deadline = st.date_input("Approval deadline", value=date.today() + timedelta(days=7))
+            if st.form_submit_button("Propose", type="primary"):
+                if not summary.strip() or content.strip() == doc["content"].strip():
+                    st.warning("Change the content and add a summary.")
+                    return
+                try:
+                    pid = governance.propose(user, doc_id, content, summary, deadline.isoformat())
+                except PermissionError as e:
+                    st.error(f"Blocked: {e}")
+                    return
+                routed = next(p for p in db.get_pending() if p["proposal_id"] == pid)
+                st.session_state.flash = (f"Proposal sent. "
+                                          f"{routing_line(routed, doc)}")
+                st.rerun()
 
 
 def render_history(user):
