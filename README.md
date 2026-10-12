@@ -15,6 +15,15 @@ pip install -r requirements.txt
 cp .env.example .env   # then fill in LLM_API_KEY and LLM_MODEL
 ```
 
+In the project-root `.env`, set `LLM_API_KEY` to your provider's API key.
+`LLM_BASE_URL` can stay blank for OpenAI; other compatible providers need their
+endpoint here. `LLM_MODEL` must name a model available from that provider.
+
+To use an existing SQLite database, place it at `spot.db` in the project root,
+or set `DB_PATH` in `.env` to its path. Startup preserves existing data and
+seeds an empty database. **Reset demo** replaces the database with sample data.
+Both `.env` and `spot.db` are gitignored.
+
 ## Run
 
 ```bash

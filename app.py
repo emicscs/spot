@@ -653,7 +653,10 @@ def api_reset():
 
 
 def main():
-    db.reset()  # every start is a clean demo
+    db.create_tables()
+    if not db.query("SELECT doc_id FROM docs LIMIT 1"):
+        import seed
+        seed.seed()
     reset_ui()
     app.run(host="127.0.0.1", port=8501, debug=False)
 
