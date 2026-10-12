@@ -34,7 +34,7 @@ const COMMANDS = [
 ];
 const savedLoc = store("spot.loc") || "chat:cutover-sync";
 const S = {
-  user: store("spot.user2") || "marcus.chen", view: savedLoc.startsWith("channel:") ? "teams" : "chat",
+  user: store("spot.user2") || window.DEMO_DEFAULT_USER || "marcus.chen", view: savedLoc.startsWith("channel:") ? "teams" : "chat",
   loc: savedLoc, spotTab: "pending", contentTab: "conversation", state: null,
   posts: [], items: [], documents: [], errors: {}, replyTo: null, pending: null,
   collapsed: new Set(["ops", "pay"]), filter: "all", busy: false, loading: false,
