@@ -1,0 +1,75 @@
+{
+  "type": "AdaptiveCard",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "ColumnSet",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "auto",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "📍 Spot",
+              "weight": "Bolder",
+              "size": "Small",
+              "color": "Accent"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "2026-10-12",
+              "horizontalAlignment": "Right",
+              "size": "Small",
+              "isSubtle": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "Approval requested from Payments",
+      "weight": "Bolder",
+      "size": "Medium",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "UAE cutover scope change (Payments depends on Ops Automation)",
+      "wrap": true
+    },
+    {
+      "type": "FactSet",
+      "facts": [
+        { "title": "Document", "value": "UAE Identity Service Integration Scope" },
+        { "title": "Proposed by", "value": "bob" },
+        { "title": "Deadline", "value": "2026-10-19" },
+        { "title": "Routed to", "value": "Payments (depends on Ops Automation)" }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.Execute",
+      "title": "Approve",
+      "verb": "approveProposal",
+      "style": "positive",
+      "data": { "action": "approve" }
+    },
+    {
+      "type": "Action.Execute",
+      "title": "Reject",
+      "verb": "rejectProposal",
+      "style": "destructive",
+      "data": { "action": "reject" }
+    }
+  ]
+}
