@@ -304,10 +304,17 @@ def history_card(params):
                 _text(h["summary"] + ("  ·  Current" if i == 0 else ""), weight="Bolder"),
                 _text(meta, isSubtle=True, size="Small", spacing="None")]},
         ]})
-    if not db.get_history(doc["doc_id"]):
-        body.append(_text(f"v{doc['version']} is the original approved version "
-                          f"(author {_name(doc['author'])}, approved by {_name(doc['approver'])}).",
-                          isSubtle=True, separator=True, spacing="Medium"))
+    if not any(h["version"] == 1 for h in db.get_history(doc["doc_id"])):
+        current = doc["version"] == 1
+        body.append({"type": "ColumnSet", "separator": True, "spacing": "Medium", "columns": [
+            {"type": "Column", "width": "44px", "items": [
+                _text("v1", weight="Bolder", size="Medium", color="Good" if current else "Default")]},
+            {"type": "Column", "width": "stretch", "items": [
+                _text("Original approved version" + ("  ·  Current" if current else ""), weight="Bolder"),
+                _text(f"Author {_name(doc['author'])}" + (f" · approved by {_name(doc['approver'])}"
+                                                        if current else ""),
+                      isSubtle=True, size="Small", spacing="None")]},
+        ]})
     not_binding = [p for p in db.get_proposals(doc["doc_id"]) if p["status"] != "approved"]
     if not_binding:
         body.append(_text("Not approved: not binding", weight="Bolder", color="Attention",
