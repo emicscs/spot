@@ -36,13 +36,14 @@ const savedLoc = store("spot.loc") || "chat:cutover-sync";
 const NATIVE_APPS = {
   calendar: { title: "Calendar", glyph: "calendar_ltr_24_regular", description: "Your program, one meeting at a time.", note: "Sample agenda · October 12–16, 2026" },
   calls: { title: "Calls", glyph: "call_24_regular", description: "Put a face to the conversation.", note: "Workspace contacts · Demo call previews" },
+  onedrive: { title: "OneDrive", glyph: "cloud_24_regular", description: "Your approved files, together.", note: "Demo workspace files · Access follows your team" },
 };
 const S = {
   user: store("spot.user2") || window.DEMO_DEFAULT_USER || "marcus.chen", view: savedLoc.startsWith("channel:") ? "teams" : "chat",
   loc: savedLoc, spotTab: "pending", contentTab: "conversation", state: null,
   posts: [], items: [], documents: [], errors: {}, replyTo: null, pending: null,
   collapsed: new Set(["ops", "pay"]), filter: "all", busy: false, loading: false,
-  requestId: 0, drawerReturn: null, agendaDay: "all",
+  requestId: 0, drawerReturn: null, agendaDay: "all", fileFilter: "all",
 };
 function md(text) {
   return esc(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
@@ -438,6 +439,7 @@ function nativeIntro(eyebrow, title, description) {
   return `<div class="files-intro"><div class="eyebrow">${esc(eyebrow)}</div><h1>${esc(title)}</h1><p>${esc(description)}</p></div>`;
 }
 function renderNativeApp() {
+  if (S.view === "onedrive") { renderFiles(true); return; }
   const inner = document.createElement("div"); inner.className = "feed-inner native-view";
   inner.innerHTML = S.view === "calls" ? renderCalls() : renderAgenda();
   $("#feed").replaceChildren(inner); $("#feed").scrollTop = 0;
@@ -467,10 +469,11 @@ function showMeeting(id) {
   const event = visibleAgenda().find((event) => event.id === id); if (!event) return;
   showDrawer("Meeting details", `<h2 class="document-title">${esc(event.title)}</h2><p class="drawer-description">${esc(event.summary)}</p><div class="profile-facts"><div><small>When</small><strong>${esc(fullDate(`${event.date}T12:00`))}</strong><small>${esc(meetingTime(event))} · local time</small></div><div><small>Organizer</small><strong>${esc(person(event.organizer).display_name)}</strong></div></div><p class="drawer-description">Sample meeting for the demo.</p><button class="btn primary" data-loc="${event.loc}">Open conversation ${icon("arrow_right_20_regular", "sm")}</button>`);
 }
-function renderFiles() {
+function renderFiles(oneDrive = false) {
+  const documents = oneDrive && S.fileFilter === "team" ? S.documents.filter((d) => d.team === S.state.me.team) : S.documents;
   const inner = document.createElement("div"); inner.className = "feed-inner files-view";
-  inner.innerHTML = `<div class="files-intro"><div class="eyebrow">Your team’s source of truth</div><h1>Approved requirements</h1><p>Current documents available to ${esc(S.state.me.team)}. Every version has a named approver.</p></div><div class="file-list"><div class="file-table-head"><span>Document</span><span>Owner</span><span>Status</span></div>${S.documents.map((d) => `<button class="file-row" data-doc="${esc(d.doc_id)}"><span class="file-name">${icon("contact_card_24_regular")}<span><strong>${esc(d.title)}</strong><small>Version ${d.version} · Updated ${shortDate(d.updated_at)}</small></span></span><span>${esc(d.team)}</span><span class="approved-pill">✓ Approved</span></button>`).join("")}</div>`;
-  if (!S.documents.length) inner.insertAdjacentHTML("beforeend", empty("No files yet", "Your team has no approved documents."));
+  inner.innerHTML = nativeIntro(oneDrive ? "OneDrive · Workspace files" : "Your team’s source of truth", oneDrive ? "All your approved files" : "Approved requirements", `Current documents available to ${S.state.me.team}. Every version has a named approver.`) + (oneDrive ? `<div class="native-filters" aria-label="Filter files">${[["all", "All accessible files"], ["team", "My team"]].map(([value, label]) => `<button class="filter-chip ${S.fileFilter === value ? "on" : ""}" data-file-filter="${value}" aria-pressed="${S.fileFilter === value}">${label}</button>`).join("")}<span class="native-result-count" role="status">${documents.length} ${documents.length === 1 ? "file" : "files"}</span></div>` : "") + `<div class="file-list"><div class="file-table-head"><span>Document</span><span>Owner</span><span>Status</span></div>${documents.map((d) => `<button class="file-row" data-doc="${esc(d.doc_id)}"><span class="file-name">${icon("contact_card_24_regular")}<span><strong>${esc(d.title)}</strong><small>Version ${d.version} · Updated ${shortDate(d.updated_at)}</small></span></span><span>${esc(d.team)}</span><span class="approved-pill">✓ Approved</span></button>`).join("")}</div>`;
+  if (!documents.length) inner.insertAdjacentHTML("beforeend", empty("No files yet", oneDrive && S.fileFilter === "team" ? "Your team has no approved documents. Try All accessible files." : "Your team has no approved documents."));
   $("#feed").replaceChildren(inner); $("#feed").scrollTop = 0;
 }
 function renderActivityMain() {
@@ -645,6 +648,7 @@ document.addEventListener("click", async (e) => {
   if (t.dataset.user) { switchUser(t.dataset.user); return; }
   if (t.dataset.person) { showPerson(t.dataset.person); return; }
   if (t.dataset.callPreview) { showCallPreview(t.dataset.callPreview); return; }
+  if (t.dataset.fileFilter) { S.fileFilter = t.dataset.fileFilter; renderFiles(true); return; }
   if (t.dataset.agendaDay) { S.agendaDay = t.dataset.agendaDay; renderNativeApp(); return; }
   if (t.dataset.meeting) { showMeeting(t.dataset.meeting); return; }
   if (t.dataset.doc) { showDocument(t.dataset.doc); return; }

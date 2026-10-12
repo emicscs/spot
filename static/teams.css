@@ -2080,6 +2080,13 @@ img {
   margin-bottom: 12px;
 }
 
+.native-result-count {
+  align-self: center;
+  color: var(--subtle);
+  font-size: 12px;
+  margin-left: auto;
+}
+
 .native-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
