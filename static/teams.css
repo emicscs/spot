@@ -2080,6 +2080,69 @@ img {
   margin-bottom: 12px;
 }
 
+.native-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+}
+
+.native-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  background: var(--card);
+  overflow-wrap: anywhere;
+}
+
+.native-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.contact-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  border-radius: 4px;
+}
+
+.contact-profile .av {
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+
+.contact-profile strong,.contact-profile small {
+  display: block;
+  line-height: 1.6;
+}
+
+.contact-profile strong { font-size: 14px; }
+.contact-profile small { font-size: 12px; color: var(--subtle); }
+
+.contact-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 360px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--stroke-strong);
+  border-radius: 5px;
+  background: var(--card);
+  color: var(--subtle);
+}
+
+.contact-search:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.contact-search input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; outline: none; }
+.contact-no-results { color: var(--subtle); font-size: 14px; }
+
 .agenda-list {
   display: flex;
   flex-direction: column;

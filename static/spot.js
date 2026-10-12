@@ -35,6 +35,7 @@ const COMMANDS = [
 const savedLoc = store("spot.loc") || "chat:cutover-sync";
 const NATIVE_APPS = {
   calendar: { title: "Calendar", glyph: "calendar_ltr_24_regular", description: "Your program, one meeting at a time.", note: "Sample agenda · October 12–16, 2026" },
+  calls: { title: "Calls", glyph: "call_24_regular", description: "Put a face to the conversation.", note: "Workspace contacts · Demo call previews" },
 };
 const S = {
   user: store("spot.user2") || window.DEMO_DEFAULT_USER || "marcus.chen", view: savedLoc.startsWith("channel:") ? "teams" : "chat",
@@ -438,12 +439,29 @@ function nativeIntro(eyebrow, title, description) {
 }
 function renderNativeApp() {
   const inner = document.createElement("div"); inner.className = "feed-inner native-view";
+  inner.innerHTML = S.view === "calls" ? renderCalls() : renderAgenda();
+  $("#feed").replaceChildren(inner); $("#feed").scrollTop = 0;
+}
+function renderAgenda() {
   const events = visibleAgenda();
   const days = [...new Set(events.map((event) => event.date))];
   if (!days.includes(S.agendaDay)) S.agendaDay = "all";
-  inner.innerHTML = nativeIntro("October 12–16, 2026", "Your week at a glance", "A sample agenda for the demo, linked to your visible conversations.") + `<div class="native-filters" aria-label="Filter agenda by day">${[["all", "This week"], ...days.map((date) => [date, new Date(`${date}T12:00`).toLocaleDateString([], { weekday: "short", day: "numeric" })])].map(([date, label]) => `<button class="filter-chip ${S.agendaDay === date ? "on" : ""}" data-agenda-day="${date}" aria-pressed="${S.agendaDay === date}">${esc(label)}</button>`).join("")}</div><div class="agenda-list">${events.filter((event) => S.agendaDay === "all" || event.date === S.agendaDay).map((event) => `<button class="agenda-event" data-meeting="${event.id}"><span class="agenda-date"><small>${new Date(`${event.date}T12:00`).toLocaleDateString([], { weekday: "short" })}</small><strong>${event.date.slice(-2)}</strong></span><span class="agenda-copy"><strong>${esc(event.title)}</strong><span>${esc(meetingTime(event))}</span><small>Organized by ${esc(person(event.organizer).display_name)}</small></span>${icon("chevron_right_12_regular", "sm")}</button>`).join("")}</div>`;
-  if (!events.length) inner.insertAdjacentHTML("beforeend", empty("No sample meetings", "Your visible conversations have no meetings in this demo agenda.", "calendar_ltr_24_regular"));
-  $("#feed").replaceChildren(inner); $("#feed").scrollTop = 0;
+  return nativeIntro("October 12–16, 2026", "Your week at a glance", "A sample agenda for the demo, linked to your visible conversations.") + `<div class="native-filters" aria-label="Filter agenda by day">${[["all", "This week"], ...days.map((date) => [date, new Date(`${date}T12:00`).toLocaleDateString([], { weekday: "short", day: "numeric" })])].map(([date, label]) => `<button class="filter-chip ${S.agendaDay === date ? "on" : ""}" data-agenda-day="${date}" aria-pressed="${S.agendaDay === date}">${esc(label)}</button>`).join("")}</div><div class="agenda-list">${events.filter((event) => S.agendaDay === "all" || event.date === S.agendaDay).map((event) => `<button class="agenda-event" data-meeting="${event.id}"><span class="agenda-date"><small>${new Date(`${event.date}T12:00`).toLocaleDateString([], { weekday: "short" })}</small><strong>${event.date.slice(-2)}</strong></span><span class="agenda-copy"><strong>${esc(event.title)}</strong><span>${esc(meetingTime(event))}</span><small>Organized by ${esc(person(event.organizer).display_name)}</small></span>${icon("chevron_right_12_regular", "sm")}</button>`).join("")}</div>` + (!events.length ? empty("No sample meetings", "Your visible conversations have no meetings in this demo agenda.", "calendar_ltr_24_regular") : "");
+}
+function chatForPerson(name) {
+  return S.state.chats.filter((chat) => chat.kind !== "bot" && chat.members.includes(name)).sort((a, b) => a.members.length - b.members.length)[0];
+}
+function renderCalls() {
+  const contacts = Object.values(S.state.people).filter((p) => p.name !== S.user && p.name !== "spot").sort((a, b) => a.display_name.localeCompare(b.display_name));
+  return nativeIntro("People", "Your workspace contacts", "Open a profile, return to a shared chat, or preview a demo call. Audio and video are off.") + `<label class="contact-search">${icon("search_20_regular")}<input id="contact-search" type="search" placeholder="Find a contact" aria-label="Find a contact" autocomplete="off"></label><div class="native-grid">${contacts.map((p) => {
+    const chat = chatForPerson(p.name);
+    return `<article class="native-card contact-card" data-contact-name="${esc(`${p.display_name} ${p.team}`.toLowerCase())}"><button class="contact-profile" data-person="${esc(p.name)}">${avatar(p.name)}<span><strong>${esc(p.display_name)}</strong><small>${esc(p.title)}</small><small>${esc(p.team)}</small></span></button><div class="native-card-actions"><button class="btn" data-call-preview="${esc(p.name)}" aria-label="Preview call with ${esc(p.display_name)}">${icon("call_24_regular", "sm")}Call preview</button>${chat ? `<button class="btn" data-loc="${esc(chat.location)}" aria-label="Open shared chat with ${esc(p.display_name)}">${icon("chat_24_regular", "sm")}Chat</button>` : ""}</div></article>`;
+  }).join("")}</div><p class="contact-no-results hidden" role="status">No matching contacts. Try another name or team.</p>`;
+}
+function showCallPreview(name) {
+  if (!S.state.people[name] || name === "spot" || name === S.user) return;
+  const p = person(name), chat = chatForPerson(name);
+  showDrawer("Call preview", `<div class="profile-top">${avatar(name, "xl")}<h2>${esc(p.display_name)}</h2><p>${esc(p.title)}</p></div><p class="drawer-description">Demo preview · Audio and video are off. You can continue in a shared conversation.</p><div class="native-card-actions">${chat ? `<button class="btn primary" data-loc="${esc(chat.location)}">Open shared chat ${icon("chat_24_regular", "sm")}</button>` : ""}<button class="btn" data-person="${esc(name)}">View profile</button></div>`);
 }
 function showMeeting(id) {
   const event = visibleAgenda().find((event) => event.id === id); if (!event) return;
@@ -626,6 +644,7 @@ document.addEventListener("click", async (e) => {
   if (t.dataset.loc) { open(t.dataset.loc); return; }
   if (t.dataset.user) { switchUser(t.dataset.user); return; }
   if (t.dataset.person) { showPerson(t.dataset.person); return; }
+  if (t.dataset.callPreview) { showCallPreview(t.dataset.callPreview); return; }
   if (t.dataset.agendaDay) { S.agendaDay = t.dataset.agendaDay; renderNativeApp(); return; }
   if (t.dataset.meeting) { showMeeting(t.dataset.meeting); return; }
   if (t.dataset.doc) { showDocument(t.dataset.doc); return; }
@@ -749,6 +768,13 @@ $("#search-results").addEventListener("keydown", (e) => {
   e.preventDefault(); results[next].focus(); results[next].scrollIntoView({ block: "nearest" });
 });
 $("#compose").addEventListener("input", () => { autosize(); saveDraft(); updatePopup(); });
+document.addEventListener("input", (e) => {
+  if (e.target.id !== "contact-search") return;
+  const term = e.target.value.trim().toLowerCase();
+  const cards = [...document.querySelectorAll("[data-contact-name]")];
+  cards.forEach((card) => card.classList.toggle("hidden", !card.dataset.contactName.includes(term)));
+  $(".contact-no-results").classList.toggle("hidden", cards.some((card) => !card.classList.contains("hidden")));
+});
 $("#compose").addEventListener("keydown", (e) => {
   const openPopup = !$("#popup").classList.contains("hidden") && popupItems.length;
   if (openPopup && ["ArrowDown", "ArrowUp"].includes(e.key)) {
