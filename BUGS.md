@@ -18,7 +18,7 @@ Snapshot at time of writing: `main` is at `d5f5aa4` (merges #7 seed, #8 rag, #9 
 
 ## Verified working (re-tested against current `main` @ `d5f5aa4`)
 
-- `python db.py` — all assertions pass (`carol` sees both teams' docs, `bob` sees only Ops Automation, `get_dependent_teams("Ops Automation") == ["Payments"]`, double `reset()` is idempotent).
+- `python db.py` — all assertions pass (`elena.rossi` sees both teams' docs, `marcus.chen` sees only Ops Automation, `get_dependent_teams("Ops Automation") == ["Payments"]`, double `reset()` is idempotent).
 - `python seed.py` — 9 docs seeded (within the 8-10 spec), 1 dependency row, 1 pending proposal on `ops-uae-gateway`, exactly one doc (`ops-uae-identity`) mentions the UAE identity cutover date. Demo doc id confirmed: **`ops-uae-identity`**, current cutover date **November 14, 2026**.
 - `app.py` (branch `frankie`, `USE_FAKES = True`) — boots clean, all three tabs render.
 

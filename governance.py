@@ -223,86 +223,86 @@ if __name__ == "__main__":
     db.reset()
 
     # Pick an Ops Automation doc from the seed so we don't depend on exact ids.
-    ops_docs = [d for d in db.get_docs_for_user("bob") if d["team"] == "Ops Automation"]
+    ops_docs = [d for d in db.get_docs_for_user("marcus.chen") if d["team"] == "Ops Automation"]
     assert ops_docs, "seed should contain at least one Ops Automation doc"
     doc_id = ops_docs[0]["doc_id"]
     before = db.get_doc(doc_id)
     history_before = len(db.get_history(doc_id))
     print(f"Using doc {doc_id!r} (team={before['team']}, version={before['version']})")
 
-    # 1. bob proposes and it routes to Payments
+    # 1. marcus.chen proposes and it routes to Payments
     pid = propose(
-        "bob", doc_id,
+        "marcus.chen", doc_id,
         before["content"] + " Cutover moved to 2026-11-21.",
         "Shift cutover by one week",
         "2026-11-21",
     )
     p = [x for x in db.get_proposals(doc_id) if x["proposal_id"] == pid][0]
     assert p["status"] == "pending", p
-    assert p["proposed_by"] == "bob", p
+    assert p["proposed_by"] == "marcus.chen", p
     assert p["required_team"] == "Payments", p
-    print(f"1. bob proposed {pid} -> routed to {p['required_team']}  OK")
+    print(f"1. marcus.chen proposed {pid} -> routed to {p['required_team']}  OK")
 
-    # 2. alice approving raises PermissionError (own team)
+    # 2. priya.raman approving raises PermissionError (own team)
     try:
-        approve("alice", pid)
-        raise AssertionError("alice should not be able to approve")
+        approve("priya.raman", pid)
+        raise AssertionError("priya.raman should not be able to approve")
     except PermissionError as e:
-        print(f"2. alice approve -> PermissionError: {e}  OK")
+        print(f"2. priya.raman approve -> PermissionError: {e}  OK")
 
-    # 3. carol approving raises PermissionError (Reader)
+    # 3. elena.rossi approving raises PermissionError (Reader)
     try:
-        approve("carol", pid)
-        raise AssertionError("carol should not be able to approve")
+        approve("elena.rossi", pid)
+        raise AssertionError("elena.rossi should not be able to approve")
     except PermissionError as e:
-        print(f"3. carol approve -> PermissionError: {e}  OK")
+        print(f"3. elena.rossi approve -> PermissionError: {e}  OK")
 
     # Nothing should have changed yet.
     assert db.get_doc(doc_id)["version"] == before["version"]
     assert len(db.get_history(doc_id)) == history_before
 
-    # 4. dave approving bumps the version and adds a history row
-    new_version = approve("dave", pid)
+    # 4. daniel.okafor approving bumps the version and adds a history row
+    new_version = approve("daniel.okafor", pid)
     after = db.get_doc(doc_id)
     hist = db.get_history(doc_id)
     assert new_version == before["version"] + 1, (new_version, before["version"])
     assert after["version"] == new_version, after
-    assert after["approver"] == "dave", after
+    assert after["approver"] == "daniel.okafor", after
     assert after["content"].endswith("Cutover moved to 2026-11-21."), after
     assert len(hist) == history_before + 1, hist
     assert hist[0]["version"] == new_version, hist[0]
-    assert hist[0]["changed_by"] == "bob", hist[0]
-    assert hist[0]["approved_by"] == "dave", hist[0]
+    assert hist[0]["changed_by"] == "marcus.chen", hist[0]
+    assert hist[0]["approved_by"] == "daniel.okafor", hist[0]
     assert hist[0]["summary"] == "Shift cutover by one week", hist[0]
     assert hist[0]["deadline"] == "2026-11-21", hist[0]
     p = [x for x in db.get_proposals(doc_id) if x["proposal_id"] == pid][0]
-    assert p["status"] == "approved" and p["approved_by"] == "dave", p
-    print(f"4. dave approved -> version {before['version']} -> {new_version}, "
+    assert p["status"] == "approved" and p["approved_by"] == "daniel.okafor", p
+    print(f"4. daniel.okafor approved -> version {before['version']} -> {new_version}, "
           f"history rows {history_before} -> {len(hist)}  OK")
 
     # Extras: double-approve is refused; reject works with the same checks.
     try:
-        approve("dave", pid)
+        approve("daniel.okafor", pid)
         raise AssertionError("approving twice should fail")
     except ValueError as e:
         print(f"   re-approve refused: {e}  OK")
 
-    pid2 = propose("alice", doc_id, "Something else", "Try again", "2026-12-01")
+    pid2 = propose("priya.raman", doc_id, "Something else", "Try again", "2026-12-01")
     try:
-        reject("bob", pid2)
-        raise AssertionError("bob should not be able to reject")
+        reject("marcus.chen", pid2)
+        raise AssertionError("marcus.chen should not be able to reject")
     except PermissionError as e:
-        print(f"   bob reject -> PermissionError: {e}  OK")
-    assert reject("dave", pid2) is None
+        print(f"   marcus.chen reject -> PermissionError: {e}  OK")
+    assert reject("daniel.okafor", pid2) is None
     p2 = [x for x in db.get_proposals(doc_id) if x["proposal_id"] == pid2][0]
-    assert p2["status"] == "rejected" and p2["approved_by"] == "dave", p2
+    assert p2["status"] == "rejected" and p2["approved_by"] == "daniel.okafor", p2
     assert db.get_doc(doc_id)["version"] == new_version  # reject changes nothing
-    print(f"   dave rejected {pid2}  OK")
+    print(f"   daniel.okafor rejected {pid2}  OK")
 
     try:
-        propose("carol", doc_id, "x", "Reader attempt", "2026-12-01")
-        raise AssertionError("carol should not be able to propose")
+        propose("elena.rossi", doc_id, "x", "Reader attempt", "2026-12-01")
+        raise AssertionError("elena.rossi should not be able to propose")
     except PermissionError as e:
-        print(f"   carol propose -> PermissionError: {e}  OK")
+        print(f"   elena.rossi propose -> PermissionError: {e}  OK")
 
     print("All governance scenarios passed.")
