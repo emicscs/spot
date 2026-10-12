@@ -242,7 +242,8 @@ def proposal_card(params):
         body.append(_text("Not approved: not binding.", size="Small", color="Attention",
                           spacing="Medium"))
         return _card(body, [full_text])
-    data = {"proposal_id": p["proposal_id"], "doc_id": p["doc_id"]}
+    data = {"proposal_id": p["proposal_id"], "doc_id": p["doc_id"],
+            "required_team": p["required_team"]}
     return _card(body, [
         {"type": "Action.Submit", "title": "Approve", "style": "positive",
          "data": {"action": "approve", **data}},
@@ -518,7 +519,8 @@ def _activity(user):
             m.get("params", {}).get("proposal_id") == p["proposal_id"]
             for post in posts for m in [post] + post["replies"])), TEAM_HOME.get(me["team"]))
         doc = db.get_doc(p["doc_id"])
-        items.append({"location": loc, "summary": p["summary"], "doc": doc["title"],
+        items.append({"location": loc, "proposal_id": p["proposal_id"],
+                      "summary": p["summary"], "doc": doc["title"],
                       "proposed_by": _name(p["proposed_by"]), "ts": p["created_at"]})
     return sorted(items, key=lambda a: a["ts"], reverse=True)
 

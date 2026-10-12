@@ -113,6 +113,14 @@ AdaptiveCards.AdaptiveCard.onProcessMarkdown = (text, result) => {
 };
 
 function renderCard(json, messageId, loc) {
+  const reviewer = json.actions?.find((a) => ["approve", "reject"].includes(a.data?.action))?.data.required_team;
+  if (reviewer && !(S.state.me.role === "Approver" && S.state.me.team === reviewer)) {
+    json = { ...json,
+      actions: json.actions.filter((a) => !["approve", "reject"].includes(a.data?.action)),
+      body: [...json.body, { type: "TextBlock", text: `Review is assigned to ${reviewer} approvers.`,
+        wrap: true, isSubtle: true, size: "Small", spacing: "Medium" }],
+    };
+  }
   const card = new AdaptiveCards.AdaptiveCard();
   card.hostConfig = createCardHostConfig();
   card.onExecuteAction = (action) => {
@@ -272,7 +280,7 @@ function renderList() {
   const { teams, chats, activity } = S.state;
   const dismiss = `<button class="icon-button sidebar-close" id="close-sidebar" aria-label="Close conversations">${icon("dismiss_20_regular")}</button>`;
   if (S.view === "activity") {
-    $("#list").innerHTML = `<div class="list-head"><h1>Activity</h1>${dismiss}</div><div class="section">Awaiting your team <span>${activity.length}</span></div>` + (activity.length ? activity.map((a) => `<button class="act" data-loc="${a.location}">${avatar("spot", "sm")}<div><strong>Approval requested</strong><small>${esc(a.summary)}</small><small>${esc(a.proposed_by)} · ${shortDate(a.ts)}</small></div></button>`).join("") : empty("All caught up", "Your team has no pending requests."));
+    $("#list").innerHTML = `<div class="list-head"><h1>Activity</h1>${dismiss}</div><div class="section">Awaiting your team <span>${activity.length}</span></div>` + (activity.length ? activity.map((a) => `<button class="act" data-review="${esc(a.proposal_id)}">${avatar("spot", "sm")}<div><strong>Approval requested</strong><small>${esc(a.summary)}</small><small>${esc(a.proposed_by)} · ${shortDate(a.ts)}</small></div></button>`).join("") : empty("All caught up", "Your team has no pending requests."));
     return;
   }
   if (S.view === "spot") {
@@ -411,7 +419,7 @@ function renderFiles() {
 }
 function renderActivityMain() {
   const inner = document.createElement("div"); inner.className = "feed-inner spot-items";
-  inner.innerHTML = `<div class="spot-intro"><div class="eyebrow">Stay in the loop</div><h1>${S.state.activity.length ? "Your team’s next decisions." : "You’re all caught up."}</h1><p>Approval requests routed to ${esc(S.state.me.team)} appear here.</p></div>${S.state.activity.map((a) => `<div class="spot-welcome"><div class="spot-welcome-top">${avatar("spot")}<div><h2>${esc(a.summary)}</h2><p>${esc(a.doc)} · Proposed by ${esc(a.proposed_by)}</p></div></div><div class="quick-prompts"><button class="btn primary" data-loc="${a.location}">Review in conversation ${icon("arrow_right_20_regular", "sm")}</button></div></div>`).join("")}`;
+  inner.innerHTML = `<div class="spot-intro"><div class="eyebrow">Stay in the loop</div><h1>${S.state.activity.length ? "Your team’s next decisions." : "You’re all caught up."}</h1><p>Approval requests routed to ${esc(S.state.me.team)} appear here.</p></div>${S.state.activity.map((a) => `<div class="spot-welcome"><div class="spot-welcome-top">${avatar("spot")}<div><h2>${esc(a.summary)}</h2><p>${esc(a.doc)} · Proposed by ${esc(a.proposed_by)}</p></div></div><div class="quick-prompts"><button class="btn primary" data-review="${esc(a.proposal_id)}">Review proposal ${icon("arrow_right_20_regular", "sm")}</button></div></div>`).join("")}`;
   if (!S.state.activity.length) inner.insertAdjacentHTML("beforeend", empty("Nothing needs your team’s attention", "Open Spot to browse pending changes across the program."));
   $("#feed").replaceChildren(inner); $("#feed").scrollTop = 0;
 }
@@ -577,6 +585,18 @@ document.addEventListener("click", async (e) => {
   if (t.dataset.user) { switchUser(t.dataset.user); return; }
   if (t.dataset.person) { showPerson(t.dataset.person); return; }
   if (t.dataset.doc) { showDocument(t.dataset.doc); return; }
+  if (t.dataset.review) {
+    if (!canNavigate()) return;
+    prepareNavigation(); S.view = "spot"; S.spotTab = "pending"; restoreDraft();
+    await loadMain("top");
+    const card = [...document.querySelectorAll(".card-host")].find((host) => host.spotCard?.messageId === t.dataset.review);
+    if (card) {
+      card.tabIndex = -1; card.focus({ preventScroll: true });
+      card.scrollIntoView({ block: "center", behavior: "smooth" }); card.classList.add("flash");
+      setTimeout(() => card.classList.remove("flash"), 2000);
+    } else toast("This proposal is no longer waiting for review.");
+    return;
+  }
   if (t.dataset.jump) {
     closeSearch(); S.contentTab = "conversation";
     if (S.view === "spot") S.spotTab = "chat";
