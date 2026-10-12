@@ -1025,6 +1025,69 @@ img {
   display: none;
 }
 
+.reset-dialog {
+  width: min(440px, calc(100vw - 32px));
+  margin: auto;
+  padding: 28px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--stroke-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+}
+
+.reset-dialog::backdrop {
+  background: #0008;
+}
+
+.reset-dialog h2 {
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.reset-dialog p {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.reset-dialog .reset-detail {
+  color: var(--subtle);
+  font-size: 13px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.reset-dialog .btn,.reset-dialog .dialog-confirm {
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 5px;
+}
+
+.reset-dialog .dialog-confirm {
+  background: #b4233d;
+  color: white;
+  border: 1px solid #b4233d;
+}
+
+.reset-dialog .dialog-confirm:hover {
+  background: #981b32;
+}
+
+.reset-dialog .dialog-confirm:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
 .feed {
   flex: 1;
   overflow-y: auto;

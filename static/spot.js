@@ -639,10 +639,24 @@ document.addEventListener("click", async (e) => {
     case "theme-toggle": applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark", true); break;
     case "reset": {
       if (!canNavigate()) return;
-      S.busy = true; t.disabled = true;
-      try { await api("/api/reset", {}); S.errors = {}; S.replyTo = null; await loadMain(); toast("Demo reset. Ready for another walkthrough."); }
+      hidePopup(); closeSearch(); setUserMenu(false); closeDrawer(); setSidebarOpen(false);
+      $("#reset-dialog").showModal(); break;
+    }
+    case "cancel-reset": $("#reset-dialog").close(); break;
+    case "confirm-reset": {
+      if (!canNavigate()) return;
+      const dialog = $("#reset-dialog"), cancel = $("#cancel-reset");
+      S.busy = true; t.disabled = true; cancel.disabled = true; t.textContent = "Resetting…";
+      dialog.setAttribute("aria-busy", "true");
+      try {
+        await api("/api/reset", {}); S.errors = {}; S.replyTo = null; await loadMain();
+        dialog.close(); toast("Demo reset. Ready for another walkthrough.");
+      }
       catch (error) { toast(error.message); }
-      finally { S.busy = false; t.disabled = false; autosize(); } break;
+      finally {
+        S.busy = false; t.disabled = false; cancel.disabled = false; t.textContent = "Reset demo";
+        dialog.removeAttribute("aria-busy"); autosize();
+      } break;
     }
     case "retry": S.state ? loadMain() : init(); break;
     case "user-button": setUserMenu($("#user-menu").classList.contains("hidden")); break;
@@ -669,6 +683,7 @@ document.addEventListener("click", async (e) => {
   }
 });
 $("#drawer-backdrop").addEventListener("click", closeDrawer);
+$("#reset-dialog").addEventListener("cancel", (e) => { if (S.busy) e.preventDefault(); });
 $("#user-select").addEventListener("change", (e) => switchUser(e.target.value));
 $("#search").addEventListener("input", renderSearch);
 $("#search").addEventListener("focus", renderSearch);

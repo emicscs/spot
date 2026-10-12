@@ -22,6 +22,7 @@ endpoint here. `LLM_MODEL` must name a model available from that provider.
 To use an existing SQLite database, place it at `spot.db` in the project root,
 or set `DB_PATH` in `.env` to its path. Startup preserves existing data and
 seeds an empty database. **Reset demo** replaces the database with sample data.
+It asks for confirmation before replacing documents, proposals, history, and chats.
 Both `.env` and `spot.db` are gitignored.
 
 ## Run

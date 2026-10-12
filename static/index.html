@@ -74,6 +74,15 @@
   </div>
   <div class="drawer-backdrop hidden" id="drawer-backdrop"></div>
   <aside class="drawer hidden" id="drawer" role="dialog" aria-modal="true" aria-label="Conversation details" tabindex="-1"></aside>
+  <dialog class="reset-dialog" id="reset-dialog" aria-labelledby="reset-title" aria-describedby="reset-description">
+    <h2 id="reset-title">Reset the demo?</h2>
+    <p id="reset-description">This replaces your documents, proposals, approval history, and chat messages with the original sample data.</p>
+    <p class="reset-detail">Your saved conversation drafts and theme stay as they are.</p>
+    <div class="dialog-actions">
+      <button class="btn" id="cancel-reset" autofocus>Cancel</button>
+      <button class="dialog-confirm" id="confirm-reset">Reset demo</button>
+    </div>
+  </dialog>
   <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
   <!--DEMO_DEFAULT_USER-->
   <script src="/static/vendor/adaptivecards.min.js"></script>
