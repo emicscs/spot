@@ -22,8 +22,8 @@
   --shadow: none;
   --shadow-lg: 0 12px 40px #29264524;
   --font: "Segoe UI", "Segoe UI Variable Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-  --sidebar-width: clamp(320px, 23.5vw, 450px);
-  --rail-width: 80px;
+  --sidebar-width: clamp(280px, 22vw, 400px);
+  --rail-width: 72px;
 }
 
 * {
@@ -139,21 +139,21 @@ img {
 
 /* Workspace chrome */
 .titlebar {
-  height: 60px;
+  height: 52px;
   flex: none;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 0 24px;
+  gap: 20px;
+  padding: 0 20px;
   border-bottom: 1px solid var(--stroke);
   background: var(--chrome);
 }
 
 .workspace-brand {
-  width: calc(var(--rail-width) + var(--sidebar-width) - 36px);
+  width: calc(var(--rail-width) + var(--sidebar-width) - 32px);
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 24px;
   font-size: 14px;
   font-weight: 600;
   flex: none;
@@ -211,11 +211,11 @@ img {
 }
 
 .tb-search {
-  height: 40px;
+  height: 34px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 18px;
+  padding: 0 14px;
   background: var(--card);
   border: 1px solid #dad9e9;
   border-radius: 5px;
@@ -236,7 +236,7 @@ img {
   background: none;
   border: 0;
   outline: 0;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .tb-search kbd {
@@ -252,7 +252,7 @@ img {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   flex: none;
 }
 
@@ -336,21 +336,21 @@ img {
 
 .rail-item {
   position: relative;
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--subtle);
 }
 
 .rail-item>.ic {
-  width: 23px;
-  height: 23px;
+  width: 21px;
+  height: 21px;
 }
 
 .rail-item:hover {
@@ -370,7 +370,7 @@ img {
   left: -7px;
   top: 9px;
   width: 2px;
-  height: 46px;
+  height: 38px;
   border-radius: 2px;
   background: var(--brand);
 }
@@ -508,14 +508,14 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 28px;
-  height: 76px;
+  padding: 0 24px;
+  height: 64px;
   border-bottom: 1px solid var(--stroke);
   flex: none;
 }
 
 .list-head h1 {
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.25;
   font-weight: 600;
   letter-spacing: 0;
@@ -529,16 +529,16 @@ img {
 .list-filters {
   display: flex;
   gap: 6px;
-  padding: 12px 28px;
+  padding: 10px 24px;
   border-bottom: 1px solid var(--stroke);
 }
 
 .filter-chip {
   border: 1px solid var(--stroke);
   border-radius: 20px;
-  font-size: 14px;
-  line-height: 28px;
-  padding: 0 12px;
+  font-size: 13px;
+  line-height: 26px;
+  padding: 0 10px;
   color: var(--subtle);
   background: transparent;
   border-color: var(--stroke-strong);
@@ -658,11 +658,11 @@ img {
   margin: 3px 16px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 12px 12px;
+  gap: 12px;
+  padding: 9px 10px;
   border-radius: 6px;
   text-align: left;
-  min-height: 72px;
+  min-height: 62px;
   border: 1px solid transparent;
 }
 
@@ -679,7 +679,7 @@ img {
 
 .row-name {
   flex: 1;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 400;
   white-space: nowrap;
   overflow: hidden;
@@ -695,13 +695,13 @@ img {
 
 .row-prev {
   font-weight: 400;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--subtle);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 0;
-  line-height: 20px;
+  line-height: 18px;
 }
 
 .chat-row.unread .row-name {
@@ -798,8 +798,8 @@ img {
 
 /* Portraits */
 .av {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   flex: none;
   position: relative;
   display: grid;
@@ -827,8 +827,8 @@ img {
 }
 
 .av.lg {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   font-size: 14px;
 }
 
@@ -896,15 +896,15 @@ img {
 }
 
 .head {
-  min-height: 76px;
+  min-height: 64px;
   flex: none;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 26px;
+  gap: 10px;
+  padding: 0 22px;
   background: var(--feed);
   border-bottom: 1px solid var(--stroke);
-  height: 76px;
+  height: 64px;
 }
 
 .head-copy {
@@ -912,8 +912,8 @@ img {
 }
 
 .head-title {
-  font-size: 22px;
-  line-height: 28px;
+  font-size: 20px;
+  line-height: 26px;
   font-weight: 600;
   letter-spacing: 0;
   white-space: nowrap;
@@ -953,7 +953,7 @@ img {
   align-items: center;
   color: var(--subtle);
   border-bottom: 2px solid transparent;
-  font-size: 16px;
+  font-size: 15px;
   padding: 2px 0 0;
   border-bottom-width: 3px;
 }
@@ -1092,7 +1092,7 @@ img {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 16px 64px 10px;
+  padding: 14px 48px 8px;
   scroll-behavior: auto;
   scrollbar-gutter: stable;
 }
@@ -1102,7 +1102,7 @@ img {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .conversation-intro {
@@ -1124,10 +1124,10 @@ img {
   align-items: center;
   gap: 18px;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 400;
   color: var(--subtle);
-  margin: 14px 0 6px;
+  margin: 12px 0 4px;
 }
 
 .day:before,.day:after {
@@ -1164,16 +1164,16 @@ img {
 .msg-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  line-height: 20px;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 18px;
   color: var(--faint);
   margin-bottom: 2px;
 }
 
 .msg-head b,.msg-head .person-button {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 12px;
+  line-height: 18px;
   font-weight: 400;
   color: var(--subtle);
 }
@@ -1196,15 +1196,15 @@ img {
 }
 
 .msg-head time {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--subtle);
 }
 
 .msg-text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 15px;
+  line-height: 22px;
 }
 
 .mention {
@@ -1236,7 +1236,7 @@ img {
   background: var(--card);
   border: 0;
   border-radius: 6px;
-  padding: 10px 18px;
+  padding: 8px 14px;
   box-shadow: none;
 }
 
@@ -1495,7 +1495,7 @@ img {
 }
 
 .spot-intro h1,.files-intro h1 {
-  font-size: 28px;
+  font-size: 25px;
   font-weight: 600;
   letter-spacing: -.8px;
   line-height: 1.4;
@@ -1628,7 +1628,7 @@ img {
 .composer {
   position: relative;
   flex: none;
-  padding: 20px 64px 16px 114px;
+  padding: 14px 48px 12px 94px;
   background: var(--feed);
 }
 
@@ -1669,13 +1669,13 @@ img {
   background: #fff;
   border: 1px solid #dddbe9;
   border-radius: 6px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   box-shadow: none;
   transition: border-color .15s,box-shadow .15s;
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 56px;
+  min-height: 48px;
   border-color: var(--stroke-strong);
 }
 
@@ -1690,7 +1690,7 @@ img {
   border: 0;
   outline: 0;
   resize: none;
-  font: 16px/24px var(--font);
+  font: 15px/22px var(--font);
   padding: 4px 0;
   max-height: 160px;
   min-height: 32px;
@@ -1818,9 +1818,9 @@ img {
 .popup {
   position: absolute;
   bottom: calc(100% - 10px);
-  left: 114px;
+  left: 94px;
   width: 380px;
-  max-width: calc(100% - 178px);
+  max-width: calc(100% - 142px);
   background: #fff;
   border: 1px solid var(--stroke);
   border-radius: 9px;
@@ -2106,7 +2106,7 @@ img {
 
 .drawer-backdrop {
   position: fixed;
-  inset: 64px 0 0;
+  inset: 52px 0 0;
   background: #28213e25;
   z-index: 45;
   backdrop-filter: blur(2px);
@@ -2115,7 +2115,7 @@ img {
 .drawer {
   position: fixed;
   right: 12px;
-  top: 75px;
+  top: 64px;
   bottom: 12px;
   width: 365px;
   max-width: calc(100vw - 24px);
@@ -2853,7 +2853,7 @@ img {
 }
 
 .chat-feed .post>.msg>.av {
-  margin-top: 22px;
+  margin-top: 20px;
 }
 
 .chat-row:focus-visible {
@@ -2871,16 +2871,16 @@ img {
 
 @media(min-width:1600px) {
   .feed {
-    padding: 16px 64px 10px;
+    padding: 14px 48px 8px;
   }
   .composer {
-    padding: 20px 64px 16px 114px;
+    padding: 14px 48px 12px 94px;
   }
 }
 
 @media(max-width:1200px) {
   :root {
-    --sidebar-width: 300px;
+    --sidebar-width: 280px;
   }
   .workspace-brand {
     width: auto;
@@ -2894,7 +2894,7 @@ img {
     padding: 18px 28px 10px;
   }
   .composer {
-    padding: 16px 28px 16px 78px;
+    padding: 12px 28px 12px 74px;
   }
   .head-title {
     font-size: 18px;
@@ -2906,14 +2906,14 @@ img {
     gap: 18px;
   }
   .popup {
-    left: 78px;
-    max-width: calc(100% - 106px);
+    left: 74px;
+    max-width: calc(100% - 102px);
   }
 }
 
 @media(max-width:960px) {
   :root {
-    --sidebar-width: 260px;
+    --sidebar-width: 250px;
   }
   .head {
     height: auto;
@@ -2936,7 +2936,7 @@ img {
     padding: 16px 20px 10px;
   }
   .composer {
-    padding: 14px 20px 14px 70px;
+    padding: 12px 20px 12px 66px;
   }
   .send-area {
     padding-left: 6px;
@@ -3108,6 +3108,28 @@ img {
 
 .chat-feed .post.continued {
   margin-top: -10px;
+}
+
+@media(min-width:761px) {
+  .chat-feed .post {
+    position: relative;
+    align-self: flex-start;
+    max-width: 100%;
+  }
+  .chat-feed .post.own {
+    align-self: flex-end;
+    max-width: 85%;
+  }
+  .chat-feed .post>.reply-link {
+    position: absolute;
+    top: -8px;
+    right: 0;
+    padding: 4px 8px;
+    border: 1px solid var(--stroke);
+    border-radius: 4px;
+    background: var(--card);
+    z-index: 2;
+  }
 }
 
 @media(max-width:760px) {
