@@ -144,6 +144,10 @@ MESSAGES = [
        "Quarterly access review for UAE workspaces is due October 20."),
     _m("m16", "chat:program-leads", "aisha.karimi", "2026-10-07T14:00:00Z",
        "For the audit trail: please don't treat call decisions as final until they're written down and approved."),
+    _m("m45", "chat:program-leads", "sofia.alvarez", "2026-10-07T14:05:00Z",
+       "Agreed. I'll include the owning team and the reviewer on each follow-up."),
+    _m("m46", "chat:program-leads", "priya.raman", "2026-10-07T14:09:00Z",
+       "Thanks. Please tag Ops when dates move so we can check the runbook impact."),
     _m("m17", "channel:arp-cutover", "priya.raman", "2026-10-08T12:00:00Z",
        "Ops cutover runbook v3 is posted. UAE identity service cutover: November 14."),
     _m("m18", "channel:pay-release", "daniel.okafor", "2026-10-08T16:30:00Z",
@@ -152,6 +156,8 @@ MESSAGES = [
     # The decision Ops Automation wasn't part of
     _m("m19", "chat:cutover-sync", "sofia.alvarez", "2026-10-09T15:10:00Z",
        "Thanks all. Recap of today's cutover sync below."),
+    _m("m41", "chat:cutover-sync", "tomas.novak", "2026-10-09T15:11:00Z",
+       "One thing to flag: we'll need time after link certification to validate the identity path end to end."),
     _m("m20", "chat:cutover-sync", "daniel.okafor", "2026-10-09T15:12:00Z",
        "Decision from the call: the UAE identity service cutover is moving two weeks, from November 14 "
        "to November 28. Network needs the time for link certification. Payments will re-pin our tests."),
@@ -171,6 +177,9 @@ MESSAGES = [
        "Yesterday's cutover sync. Adding you and Marcus to the recap chat now.", thread_parent_id="m23"),
     _m("m26", "chat:cutover-sync", "system", "2026-10-10T09:11:00Z",
        "Sofia Alvarez added Marcus Chen and Priya Raman to the chat and shared all chat history."),
+    _m("m42", "chat:cutover-sync", "priya.raman", "2026-10-10T09:16:00Z",
+       "Thanks for adding us. Marcus, can you capture the date change for review? I'll keep the runbook "
+       "on the approved date until it's signed off."),
 
     # Spot in action
     _m("m27", "chat:cutover-sync", "marcus.chen", "2026-10-10T09:20:00Z",
@@ -183,12 +192,20 @@ MESSAGES = [
        "Sorry for the ping earlier. I should have looped Ops into the sync."),
     _m("m30", "chat:dm-sofia-priya", "priya.raman", "2026-10-10T09:34:00Z",
        "No worries. Marcus captured it in Spot, so it's on record once Payments approves."),
+    _m("m47", "chat:dm-sofia-priya", "sofia.alvarez", "2026-10-10T09:36:00Z",
+       "I'll put Ops on the next invite too. Can you flag anything else that needs a handover?"),
+    _m("m48", "chat:dm-sofia-priya", "priya.raman", "2026-10-10T09:38:00Z",
+       "Will do. The runbook is the main one; I'll check the owners list this afternoon."),
 
     # The unsigned proposal
+    _m("m43", "chat:gateway-readiness", "elena.rossi", "2026-10-10T13:58:00Z",
+       "I'm updating the release checklist. Do we have a confirmed gateway date, or is that still under discussion?"),
     _m("m31", "chat:gateway-readiness", "tomas.novak", "2026-10-10T14:00:00Z",
        "If identity moves out, can the gateway go a week earlier? The link is ready for gateway traffic sooner."),
     _m("m32", "chat:gateway-readiness", "ravi.menon", "2026-10-10T14:04:00Z",
        "Works for Ops if Payments signs off."),
+    _m("m44", "chat:gateway-readiness", "marcus.chen", "2026-10-10T14:06:00Z",
+       "I'll put the earlier date up for review. Elena, leave the checklist on the current approved date for now."),
     _m("m33", "chat:gateway-readiness", "marcus.chen", "2026-10-10T14:07:00Z",
        "@Spot add Move UAE gateway cutover up one week", thread_parent_id="m31", mentions_spot=True),
     _m("m34", "chat:gateway-readiness", "spot", "2026-10-10T14:07:05Z",
@@ -212,4 +229,8 @@ MESSAGES = [
        "Thanks for the heads-up on the template. Who decides on the gateway date?"),
     _m("m40", "chat:dm-hannah-ravi", "ravi.menon", "2026-10-11T10:34:00Z",
        "Anything Payments depends on needs a Payments approver. That's Daniel."),
+    _m("m49", "chat:dm-hannah-ravi", "hannah.brooks", "2026-10-11T10:36:00Z",
+       "Got it, thanks! I'll add him to the owners list. Is there a runbook review I should join?"),
+    _m("m50", "chat:dm-hannah-ravi", "ravi.menon", "2026-10-11T10:38:00Z",
+       "Yes, the Thursday review. I'll forward the invite and walk you through the checklist beforehand."),
 ]
