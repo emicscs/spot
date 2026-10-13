@@ -31,10 +31,6 @@ Both `.env` and `spot.db` are gitignored.
 python app.py
 ```
 
-Open http://localhost:8501. The UI is a Microsoft Teams lookalike for a fictional Mastercard workspace (all people and conversations are fictional; see `workspace.py`). Mention **@Spot** in any channel or chat, or open **Spot** in the left rail for Pending, History and Chat. Switch demo users with **Signed in as** in the top bar; **Reset demo** restores the seed data.
-
-Demo users: Marcus Chen (Ops Automation, Contributor), Priya Raman (Ops Automation, Approver), Daniel Okafor (Payments, Approver), Elena Rossi (Payments, Reader). Walkthrough: [demo_script.md](demo_script.md).
-
 The workspace includes local profile portraits, searchable conversations and approved
 files (Ctrl/Cmd + K), member profiles, conversation drafts, and responsive navigation.
 Chats show messages and quoted replies in time order; channels retain post threads.
@@ -46,16 +42,12 @@ Use the sun/moon button in the top bar to switch light and dark mode. Your choic
 is remembered in this browser; until you choose, the app follows your system theme.
 After backend changes, restart the Flask server before refreshing the browser.
 
-## Contract
+## Contributors
 
-Read [CONTRACTS.md](CONTRACTS.md) before writing any code. It is frozen: nobody changes it.
-
-| File | Owner |
-|---|---|
-| db.py | Contributor 2 |
-| seed.py | Contributor 3 |
-| governance.py | Contributor 4 |
-| rag.py | Contributor 5 |
-| app.py, static/, workspace.py | Contributor 1 |
-| demo_script.md, SOW, integration | Contributor 6 |
-| config.py | shared, do not edit |
+This project was built by:
+- Esther Li
+- Frankie Febbo
+- Evan Su
+- Derrick Sual
+- Aarnav Hariramani
+- Emilio Cardillo-Schrader
