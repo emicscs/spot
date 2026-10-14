@@ -1,6 +1,6 @@
 # Spot
 
-Version control for project requirements, for a Mastercard program with many interdependent teams.
+Version control for project requirements.
 
 - A change to a requirements doc is a **proposal** (like a pull request).
 - It is routed to the teams that depend on the doc's team (like CODEOWNERS).
